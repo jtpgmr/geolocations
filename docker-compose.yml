@@ -19,11 +19,11 @@ services:
     container_name: geolocations-postgres
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
+      POSTGRES_DB: ${DB__DATABASE_NAME:-postgres}
+      POSTGRES_USER: ${DB__USER:-postgres}
+      POSTGRES_PASSWORD: ${DB__PASSWORD:-postgres}
     ports:
-      - 5432:5432
+      - ${DB__PORT:-5432}:5432
     volumes:
       - postgres_data:/var/lib/postgresql/data/
 

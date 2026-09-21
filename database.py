@@ -1,11 +1,13 @@
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-DATABASE_URL = (
-    f"postgresql+asyncpg://postgres:postgres@geolocations-postgres:5432/postgres"
-)
+# DATABASE_URL = (
+#     "postgresql+asyncpg://postgres:postgres@geolocations-postgres:5432/postgres"
+# )
+
+DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:3579/postgres"
 
 
 class Base(DeclarativeBase):

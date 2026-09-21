@@ -7,6 +7,10 @@ A comprehensive, step-by-step coding tutorial is accessible in this [Medium post
 2. Build Docker images: `docker-compose build`
 3. Run Docker containers: `docker-compose up`
 
+### Commands for running locally (non-container) 
+*** DB setup (apply migrations): `alembic upgrade head`
+*** Start server: `uvicorn main:app --host=0.0.0.0 --port=8000 --reload`
+
  
 ### Tools/Libaries used:
 - FastAPI, uvicorn
