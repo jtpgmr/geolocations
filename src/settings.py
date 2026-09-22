@@ -1,4 +1,5 @@
 from __future__ import annotations
+from functools import lru_cache
 
 from pydantic import (
     Field,
@@ -51,3 +52,8 @@ class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(**BASE_SETTINGS_CONFIG)
 
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)  # type: ignore[arg-type]
+
+
+@lru_cache
+def getSettings() -> AppSettings:
+    return AppSettings()
