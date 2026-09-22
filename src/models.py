@@ -16,6 +16,12 @@ class NearbyCitiesByCoordsSchema(BaseModel):
     km_within: PositiveInt
 
 
+class StateModel(BaseModel):
+    name: str
+    number: str | int
+    abbreviation: str
+
+
 class CitySchema(BaseModel):
     city: str
     county: str

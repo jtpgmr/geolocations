@@ -1,34 +1,66 @@
+from dataclasses import dataclass
+from enum import StrEnum
 from typing import Final
 
+from src.models import CitySchema, StateModel
+from src.schema import Base, State, City
+
 import httpx2
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 BASE = (
     "https://tigerweb.geo.census.gov/arcgis/rest/services/"
     "TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer"
 )
 
-BASE_URL: Final = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/"
+BASE_URL: Final = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb"
+
+
+def generateURL(service: str, layer: int | str):
+    return f"{BASE_URL}/{service}/MapServer/{layer}/query"
+
+
+class GeoTypeNames(StrEnum):
+    CITY = "city"
+    STATE = "state"
+
+
+GEO_TYPE_ORDER = {
+    GeoTypeNames.STATE: 0,
+    GeoTypeNames.CITY: 1,
+}
+
+
+@dataclass
+class GeoType:
+    name: GeoTypeNames
+    db_schema: type[Base]
+    model: type[BaseModel]
 
 
 class TigerWebEndpointParams(BaseModel):
     out_fields: list[str] = Field(alias="outFields")
     return_geometry: bool = Field(default=False, alias="returnGeometry")
-    where: Final = "1=1"
-    f: Final = "json"
+    where: str = "1=1"
+    f: str = "json"
+
+    @field_serializer("out_fields")
+    def serialize_out_fields(self, out_fields) -> str:
+        return ",".join(out_fields)
 
 
 class TigerWebEndpoint(BaseModel):
-    route: str
-    # schema: DeclarativeBase
-    query: str | int
+    geotype: GeoType
+    service: str
+    layer: str | int
     params: TigerWebEndpointParams
 
 
 TIGER_WEB_ENDPOINTS: list[TigerWebEndpoint] = [
     TigerWebEndpoint(
-        route="State_County",
-        query=0,
+        geotype=GeoType(name=GeoTypeNames.STATE, db_schema=State, model=StateModel),
+        service="State_County",
+        layer=0,
         params=TigerWebEndpointParams(
             outFields=[
                 "NAME",
@@ -36,80 +68,40 @@ TIGER_WEB_ENDPOINTS: list[TigerWebEndpoint] = [
                 "STUSAB",
             ]
         ),
-    )
+    ),
+    TigerWebEndpoint(
+        geotype=GeoType(name=GeoTypeNames.CITY, db_schema=City, model=CitySchema),
+        service="Places_CouSub_ConCity_SubMCD",
+        layer=4,
+        params=TigerWebEndpointParams(
+            outFields=["GEOID", "STATE", "BASENAME", "NAME", "CENTLAT", "CENTLON"]
+        ),
+    ),
+    TigerWebEndpoint(
+        geotype=GeoType(name=GeoTypeNames.CITY, db_schema=City, model=CitySchema),
+        service="Places_CouSub_ConCity_SubMCD",
+        layer=5,
+        params=TigerWebEndpointParams(
+            outFields=["GEOID", "STATE", "BASENAME", "NAME", "CENTLAT", "CENTLON"]
+        ),
+    ),
 ]
-# for state, replace `Places_CouSub_ConCity_SubMCD` with `State_County`
-LAYER = {
-    "states": {
-        0: {
-            "where": "1=1",
-            "outFields": "STATE,STUSAB,NAME",
-            "returnGeometry": "false",
-            "f": "json",
-        }
-    },
-    "cities": {
-        4: {
-            "where": "1=1",
-            "outFields": "GEOID,STATE,BASENAME,NAME,CENTLAT,CENTLON",
-            "returnGeometry": "false",
-            "f": "json",
-        },
-        5: {
-            "where": "1=1",
-            "outFields": "GEOID,STATE,BASENAME,NAME,CENTLAT,CENTLON",
-            "returnGeometry": "false",
-            "f": "json",
-        },
-    },
-}
+
 
 if __name__ == "__main__":
-    # rows = []
+    TIGER_WEB_ENDPOINTS.sort(key=lambda endpoint: GEO_TYPE_ORDER[endpoint.geotype.name])
 
-    # for layer in (4, 5):
-    #     response = httpx2.get(f"{BASE}/{layer}/query", params=params)
-    #     response.raise_for_status()
+    for tw_endpoint in TIGER_WEB_ENDPOINTS:
+        tw_endpoint: TigerWebEndpoint
 
-    #     for feature in response.json()["features"]:
-    #         attributes = feature["attributes"]
-    #         print(attributes)
+        url = generateURL(tw_endpoint.service, tw_endpoint.layer)
+        params = tw_endpoint.params.model_dump(by_alias=True)
 
-    #     rows.extend(feature["attributes"] for feature in response.json()["features"])
+        response = httpx2.get(url, params=params)
+        response.raise_for_status()
 
-    for domain, layer in LAYER.items():
-        for layer_id, params in layer.items():
-            response = httpx2.get(f"{BASE}/{layer_id}/query", params=params)
-            print(response.url)
-            continue
-            response.raise_for_status()
+        location_data = [
+            feature["attributes"] for feature in response.json()["features"]
+        ]
 
-            rows = []
-            # if domain == "cities":
-            #     print("here")
-            #     for feature in response.json()["features"][:1]:
-            #         attributes = feature["attributes"]
-            #         print(attributes)
-
-            if domain == "states":
-                # for feature in response.json():
-                # attributes = feature["attributes"]
-                print(response.json())
-
-            # rows.extend(
-            #     feature["attributes"] for feature in response.json()["features"]
-            # )
-
-    # print(rows[0])
-    # print(len(rows))
-
-    # seen = set()
-
-    # for row in rows:
-    #     geoid = row["GEOID"]
-
-    #     if geoid not in seen:
-    #         seen.add(geoid)
-    #         continue
-
-    #     print(geoid)
+        print(len(location_data))

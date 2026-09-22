@@ -46,14 +46,9 @@ class Schema(StrEnum):
     LOCATIONS = "locations"
 
 
-class LocationsSchema(Base):
+class LocationsSchema(Base, UpdatableMixin):
     __abstract__ = True
     __table_args__: tuple = ({"schema": Schema.LOCATIONS},)
-
-
-# from sqlalchemy.orm import Mapped, mapped_column
-
-# from database import Base
 
 
 class State(LocationsSchema):
