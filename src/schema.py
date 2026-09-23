@@ -5,9 +5,13 @@ import uuid
 from datetime import datetime as dt
 
 from geoalchemy2 import Geometry, WKBElement
-from sqlalchemy import DateTime, Identity, text, Integer, String
+from sqlalchemy import DateTime, Identity, text, Integer, String, SmallInteger
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from geoalchemy2.shape import to_shape
+from sqlalchemy.types import TypeDecorator
+
+__all__ = ["Base", "City", "State"]
 
 
 class Base(DeclarativeBase):
@@ -51,9 +55,36 @@ class LocationsSchema(Base, UpdatableMixin):
     __table_args__: tuple = ({"schema": Schema.LOCATIONS},)
 
 
+class WKTPoint(TypeDecorator):
+    """PostGIS POINT column that accepts and returns WKT strings."""
+
+    impl = Geometry
+    # cache_ok = True
+
+    def __init__(self, srid: int = 4326, **kwargs):
+        super().__init__(geometry_type="POINT", srid=srid, **kwargs)
+        self.srid = srid
+
+    def process_bind_param(self, value, dialect):
+        # Python -> DB: "POINT(lon lat)" -> WKTElement with the SRID attached
+        if value is None or isinstance(value, (WKBElement)):
+            return value
+        return WKBElement(value, srid=self.srid)
+
+    def process_result_value(self, value, dialect):
+        # DB -> Python [str]: WKBElement -> "POINT(lon lat)"
+        if value is None:
+            return None
+        return to_shape(value).wkt
+
+
 class State(LocationsSchema):
     __tablename__ = "states"
     __table_args__ = (*LocationsSchema.__table_args__,)
+
+    name: Mapped[str] = mapped_column(String(100))
+    abbreviation: Mapped[str] = mapped_column(String(2))
+    tigerweb_number: Mapped[str | int] = mapped_column(SmallInteger())
 
 
 class City(LocationsSchema):
@@ -65,6 +96,5 @@ class City(LocationsSchema):
     state_name: Mapped[str] = mapped_column(String(50))
     city: Mapped[str] = mapped_column(String(50))
     county: Mapped[str] = mapped_column(String(50))
-    geo_location: Mapped[WKBElement] = mapped_column(
-        Geometry(geometry_type="POINT", srid=4326, spatial_index=True)
-    )
+
+    geo_location: Mapped[str] = mapped_column(WKTPoint(srid=4326, spatial_index=True))

@@ -2,11 +2,17 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Final
 
-from src.models import CitySchema, StateModel
-from src.schema import Base, State, City
+from src.models import City as CityModel, State as StateModel
+from src.schema import Base, City as CityTable, State as StateTable
 
 import httpx2
 from pydantic import BaseModel, Field, field_serializer
+from sqlalchemy import select
+
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects.postgresql.dml import Insert
+from sqlalchemy.ext.asyncio import AsyncSession
+
 
 BASE = (
     "https://tigerweb.geo.census.gov/arcgis/rest/services/"
@@ -34,8 +40,13 @@ GEO_TYPE_ORDER = {
 @dataclass
 class GeoType:
     name: GeoTypeNames
-    db_schema: type[Base]
+    db_table: type[Base]
     model: type[BaseModel]
+
+
+class GeoTypes:
+    CITY = GeoType(name=GeoTypeNames.CITY, db_table=CityTable, model=CityModel)
+    STATE = GeoType(name=GeoTypeNames.STATE, db_table=StateTable, model=StateModel)
 
 
 class TigerWebEndpointParams(BaseModel):
@@ -58,19 +69,15 @@ class TigerWebEndpoint(BaseModel):
 
 TIGER_WEB_ENDPOINTS: list[TigerWebEndpoint] = [
     TigerWebEndpoint(
-        geotype=GeoType(name=GeoTypeNames.STATE, db_schema=State, model=StateModel),
+        geotype=GeoTypes.STATE,
         service="State_County",
         layer=0,
         params=TigerWebEndpointParams(
-            outFields=[
-                "NAME",
-                "STATE",
-                "STUSAB",
-            ]
+            outFields=["NAME", "STATE", "STUSAB", "CENTLAT", "CENTLON"]
         ),
     ),
     TigerWebEndpoint(
-        geotype=GeoType(name=GeoTypeNames.CITY, db_schema=City, model=CitySchema),
+        geotype=GeoTypes.CITY,
         service="Places_CouSub_ConCity_SubMCD",
         layer=4,
         params=TigerWebEndpointParams(
@@ -78,7 +85,7 @@ TIGER_WEB_ENDPOINTS: list[TigerWebEndpoint] = [
         ),
     ),
     TigerWebEndpoint(
-        geotype=GeoType(name=GeoTypeNames.CITY, db_schema=City, model=CitySchema),
+        geotype=GeoTypes.CITY,
         service="Places_CouSub_ConCity_SubMCD",
         layer=5,
         params=TigerWebEndpointParams(
@@ -86,6 +93,14 @@ TIGER_WEB_ENDPOINTS: list[TigerWebEndpoint] = [
         ),
     ),
 ]
+
+
+async def addCityToDatabase(session: AsyncSession, city: CityTable) -> None:
+    add_city_statement: Insert = insert(CityTable).values()
+
+    add_city_statement = add_city_statement.on_conflict_do_nothing(index_elements=[])
+
+    await session.execute(add_city_statement)
 
 
 if __name__ == "__main__":
@@ -99,9 +114,11 @@ if __name__ == "__main__":
 
         response = httpx2.get(url, params=params)
         response.raise_for_status()
+        print(response.url)
 
         location_data = [
-            feature["attributes"] for feature in response.json()["features"]
+            feature["attributes"] for feature in response.json()["features"][:1]
         ]
 
+        print(location_data)
         print(len(location_data))
