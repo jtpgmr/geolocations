@@ -91,7 +91,7 @@ class States(LocationsSchema):
     name: Mapped[str] = mapped_column(String(100))
     abbreviation: Mapped[str] = mapped_column(String(2))
     tigerweb_number: Mapped[str | int] = mapped_column(String())
-    geo_location: Mapped[GeoPoint]
+    geo_point: Mapped[GeoPoint]
 
 
 class Cities(LocationsSchema):
@@ -104,7 +104,7 @@ class Cities(LocationsSchema):
     name: Mapped[str] = mapped_column(String(100))
 
     tigerweb_number: Mapped[str | int] = mapped_column(String())
-    geo_location: Mapped[GeoPoint]
+    geo_point: Mapped[GeoPoint]
 
 
 class Counties(LocationsSchema):

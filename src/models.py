@@ -55,7 +55,7 @@ class State(BaseModel):
     tigerweb_number: StateTigerWebNumber
 
     @computed_field
-    def geo_location(self) -> WKBElement:
+    def geo_point(self) -> WKBElement:
         # x = longitude, y = latitude
         return from_shape(Point(self.longitude, self.latitude), srid=4326)
 
@@ -64,7 +64,7 @@ class State(BaseModel):
             "name": self.name,
             "abbreviation": self.abbreviation,
             "tigerweb_number": self.tigerweb_number,
-            "geo_location": self.geo_location,
+            "geo_point": self.geo_point,
         }
 
 

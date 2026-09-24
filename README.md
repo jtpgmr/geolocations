@@ -24,3 +24,5 @@ A comprehensive, step-by-step coding tutorial is accessible in this [Medium post
 ### Swagger UI
 ![image](https://github.com/notarious2/geolocations/assets/104051317/270c8a68-8ffc-4ad0-aafe-604e2a293030)
 
+https://github.com/streamlit/demo-pydeck-maps/blob/main/streamlit_app.py
+https://github.com/streamlit/example-data/tree/master/hello/v1

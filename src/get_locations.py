@@ -73,8 +73,6 @@ class TigerWebEndpoint(BaseModel):
 async def addStateToDatabase(session: AsyncSession, states: list[StateModel]) -> None:
     values: list[dict] = [state.to_orm() for state in states]
 
-    # raise Exception(values[0].serial_id)
-
     add_city_statement: Insert = insert(StatesTable).values(values)
 
     add_city_statement = add_city_statement.on_conflict_do_nothing()
