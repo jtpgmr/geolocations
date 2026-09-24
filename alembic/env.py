@@ -3,7 +3,12 @@ import asyncio
 
 from sqlalchemy import pool, Engine
 from sqlalchemy import Connection, create_engine, pool, schema, text
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy.ext.asyncio import (
+    async_engine_from_config,
+    create_async_engine,
+    AsyncEngine,
+    AsyncConnection,
+)
 from sqlalchemy.sql.schema import MetaData
 
 from alembic import context
@@ -41,9 +46,9 @@ def includeName(name: str | None, db_obj_type: str, parent_names: dict) -> bool:
     return True
 
 
-def ensureSchemas(connection: Connection) -> None:
+async def ensureSchemas(connection: AsyncConnection) -> None:
     for name in MANAGED_SCHEMA_NAMES:
-        connection.execute(schema.CreateSchema(name, if_not_exists=True))
+        await connection.execute(schema.CreateSchema(name, if_not_exists=True))
 
 
 CONFIGURE_KWARGS: dict = {
@@ -80,21 +85,43 @@ def run_migrations_offline(database_url: str) -> None:
         context.run_migrations()
 
 
-def run_migrations_online(database_url: str) -> None:
-    connectable: Engine = create_engine(database_url, poolclass=pool.NullPool)
-    try:
-        with connectable.connect() as connection:
-            ensureSchemas(connection)
-            connection.commit()
+def run_sync_migrations(connection: Connection) -> None:
+    context.configure(connection=connection, **CONFIGURE_KWARGS)
 
-            context.configure(connection=connection, **CONFIGURE_KWARGS)
-            with context.begin_transaction():
-                context.run_migrations()
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+async def run_connectable(connectable: AsyncEngine):
+    try:
+        async with connectable.connect() as connection:
+            await ensureSchemas(connection)
+            await connection.commit()
+
+            async with connectable.connect() as connection:
+                await connection.run_sync(run_sync_migrations)
     finally:
-        connectable.dispose()
+        await connectable.dispose()
+
+
+async def run_async_migrations(database_url: str) -> None:
+    connectable: AsyncEngine = create_async_engine(
+        database_url, poolclass=pool.NullPool
+    )
+
+    await run_connectable(connectable)
+
+
+def run_migrations_online(database_url: str) -> None:
+    connectable: AsyncEngine = create_async_engine(
+        database_url, poolclass=pool.NullPool
+    )
+
+    asyncio.run(run_connectable(connectable))
 
 
 database_url = getSettings().db.dsn
+
 
 if context.is_offline_mode():
     run_migrations_offline(database_url)

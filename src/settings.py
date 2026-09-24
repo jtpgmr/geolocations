@@ -27,18 +27,19 @@ class DatabaseSettings(BaseSettings):
     password: SecretStr
     database_name: SecretStr
     port: int = 5432
+    driver: str | None = "asyncpg"
 
     @field_validator("port", mode="before")
     @classmethod
     def setDefaultPort(cls, port: object) -> object:
-        return 5432 if port == "" else port
+        return 5432 if not port else port
 
     @computed_field
     @property
     def dsn(self) -> str:
         return str(
             PostgresDsn.build(
-                scheme="postgresql+asyncpg",
+                scheme=f"postgresql+{self.driver}",
                 username=self.user.get_secret_value(),
                 password=self.password.get_secret_value(),
                 host=self.host.get_secret_value(),

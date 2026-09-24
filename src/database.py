@@ -22,7 +22,7 @@ class DatabaseTransactionError(RuntimeError):
     pass
 
 
-class AsyncDatabase:
+class Database:
     """Owns one async engine + pool. Cheap to construct; `connect()` builds
     the pool, `close()` disposes it. Use as an async context manager."""
 

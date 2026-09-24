@@ -1,15 +1,27 @@
 from __future__ import annotations
+from typing import Annotated
 
 from enum import StrEnum
 import uuid
 from datetime import datetime as dt
 
-from geoalchemy2 import Geometry, WKBElement
-from sqlalchemy import DateTime, Identity, text, Integer, String, SmallInteger
+from sqlalchemy import (
+    DateTime,
+    Identity,
+    text,
+    Integer,
+    String,
+    SmallInteger,
+    UniqueConstraint,
+    ForeignKey,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from geoalchemy2 import Geometry, WKBElement
 from geoalchemy2.shape import to_shape
-from sqlalchemy.types import TypeDecorator
+from geoalchemy2.shape import from_shape
+from shapely.geometry import Point
+
 
 __all__ = ["Base", "City", "State"]
 
@@ -55,46 +67,63 @@ class LocationsSchema(Base, UpdatableMixin):
     __table_args__: tuple = ({"schema": Schema.LOCATIONS},)
 
 
-class WKTPoint(TypeDecorator):
-    """PostGIS POINT column that accepts and returns WKT strings."""
-
-    impl = Geometry
-    # cache_ok = True
-
-    def __init__(self, srid: int = 4326, **kwargs):
-        super().__init__(geometry_type="POINT", srid=srid, **kwargs)
-        self.srid = srid
-
-    def process_bind_param(self, value, dialect):
-        # Python -> DB: "POINT(lon lat)" -> WKTElement with the SRID attached
-        if value is None or isinstance(value, (WKBElement)):
-            return value
-        return WKBElement(value, srid=self.srid)
-
-    def process_result_value(self, value, dialect):
-        # DB -> Python [str]: WKBElement -> "POINT(lon lat)"
-        if value is None:
-            return None
-        return to_shape(value).wkt
+GeoPoint = Annotated[
+    WKBElement,
+    mapped_column(
+        Geometry(
+            geometry_type="POINT",
+            srid=4326,
+            spatial_index=True,
+        ),
+        nullable=False,
+    ),
+]
 
 
-class State(LocationsSchema):
+class States(LocationsSchema):
     __tablename__ = "states"
-    __table_args__ = (*LocationsSchema.__table_args__,)
+    __table_args__ = (
+        UniqueConstraint("abbreviation", name="uq_states_abbreviation"),
+        UniqueConstraint("name", name="uq_states_name"),
+        *LocationsSchema.__table_args__,
+    )
 
     name: Mapped[str] = mapped_column(String(100))
     abbreviation: Mapped[str] = mapped_column(String(2))
-    tigerweb_number: Mapped[str | int] = mapped_column(SmallInteger())
+    tigerweb_number: Mapped[str | int] = mapped_column(String())
+    geo_location: Mapped[GeoPoint]
 
 
-class City(LocationsSchema):
-    __tablename__ = "city"
+class Cities(LocationsSchema):
+    __tablename__ = "cities"
     __table_args__ = (*LocationsSchema.__table_args__,)
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    state_code: Mapped[str] = mapped_column(String(2))
-    state_name: Mapped[str] = mapped_column(String(50))
-    city: Mapped[str] = mapped_column(String(50))
-    county: Mapped[str] = mapped_column(String(50))
+    state_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{States.__table__}.id"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(100))
 
-    geo_location: Mapped[str] = mapped_column(WKTPoint(srid=4326, spatial_index=True))
+    tigerweb_number: Mapped[str | int] = mapped_column(String())
+    geo_location: Mapped[GeoPoint]
+
+
+class Counties(LocationsSchema):
+    __tablename__ = "counties"
+    __table_args__ = (*LocationsSchema.__table_args__,)
+
+
+class CountyCities(LocationsSchema):
+    __tablename__ = "county_cities"
+
+    __table_args__ = (
+        UniqueConstraint("county_id", "city_id", name="uq_county_city"),
+        *LocationsSchema.__table_args__,
+    )
+
+    county_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{States.__table__}.id"), nullable=False
+    )
+
+    city_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{Cities.__table__}.id"), nullable=False
+    )
