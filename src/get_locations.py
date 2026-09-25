@@ -29,8 +29,12 @@ BASE = (
 BASE_URL: Final = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb"
 
 
+def generateEndpoint(service: str, layer: int | str):
+    return f"/{service}/MapServer/{layer}/query"
+
+
 def generateURL(service: str, layer: int | str):
-    return f"{BASE_URL}/{service}/MapServer/{layer}/query"
+    return f"{BASE_URL}{generateEndpoint(service, layer)}"
 
 
 class GeoTypeNames(StrEnum):
@@ -125,16 +129,19 @@ TIGER_WEB_ENDPOINTS: list[TigerWebEndpoint] = [
 ]
 
 
-async def get_locations(db: Database):
-    # TODO: add async http client init alongside db session
-    async with db.transaction(read_only=False) as session:
+# TODO: release prints with logs
+async def insert_locations_to_database(db: Database):
+    async with (
+        db.transaction(read_only=False) as session,
+        httpx2.AsyncClient(base_url=BASE_URL) as http_client,
+    ):
         for tw_endpoint in TIGER_WEB_ENDPOINTS:
             tw_endpoint: TigerWebEndpoint
 
-            url = generateURL(tw_endpoint.service, tw_endpoint.layer)
+            endpoint = generateEndpoint(tw_endpoint.service, tw_endpoint.layer)
             params = tw_endpoint.params.model_dump(by_alias=True)
 
-            response = httpx2.get(url, params=params)
+            response = await http_client.get(endpoint, params=params)
             response.raise_for_status()
             print(response.url)
 
@@ -160,4 +167,4 @@ if __name__ == "__main__":
     db = Database(db_url)
     db.connect()
 
-    asyncio.run(get_locations(db))
+    asyncio.run(insert_locations_to_database(db))

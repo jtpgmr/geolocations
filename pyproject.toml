@@ -9,10 +9,15 @@ dependencies = [
     "asyncpg>=0.31.0",
     "fastapi>=0.141.1",
     "geoalchemy2[shapely]>=0.20.0",
+    "geopandas>=1.1.4",
     "httpx2>=2.13.0",
+    "pandas>=3.0.6",
+    "psycopg[binary]>=3.3.6",
     "pydantic-extra-types>=2.11.1",
     "pydantic-settings>=2.15.0",
+    "pydeck>=0.9.3",
     "sqlalchemy>=2.0.54",
+    "streamlit>=1.64.0",
     "uvicorn>=0.53.0",
 ]
 
