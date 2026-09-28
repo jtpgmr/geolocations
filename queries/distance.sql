@@ -1,5 +1,5 @@
 WITH distances AS
-    (SELECT ST_Distance(a.geo_location::geography, b.geo_location::geography) AS distance_meters
+    (SELECT ST_Distance(a.geo_point::geography, b.geo_point::geography) AS distance_meters
      FROM locations.states a
      JOIN locations.states b ON a.abbreviation = 'NY'
      AND b.abbreviation = 'NJ')
@@ -10,18 +10,18 @@ FROM distances;
 -- Cartesian-style ordering POINT(longitutde, latitude)
 
 SELECT name,
-       ST_AsText(geo_location) as cartesian_coordinate,
-       ST_Y(geo_location) AS latitude,
-       ST_X(geo_location) AS longitude
-FROM locations.states
-WHERE abbreviation IN ('NJ',
-                       'NY');
+       ST_AsText(geo_point) as cartesian_coordinate,
+       ST_Y(geo_point) AS latitude,
+       ST_X(geo_point) AS longitude
+FROM locations.states -- WHERE abbreviation IN ('NJ',
+--                        'NY')
+ ;
 
 WITH coordinates as
     (SELECT name,
             abbreviation,
-            ST_Y(geo_location) AS latitude,
-            ST_X(geo_location) AS longitude
+            ST_Y(geo_point) AS latitude,
+            ST_X(geo_point) AS longitude
      FROM locations.states
      WHERE abbreviation IN ('NJ',
                             'NY')),

@@ -1,0 +1,6 @@
+import httpx2
+
+_DEFAULT_TIMEOUT_SECONDS: float = 10.0
+_DEFAULT_TIMEOUT = httpx2.Timeout(_DEFAULT_TIMEOUT_SECONDS)
+
+EPSG = 4326

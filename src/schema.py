@@ -22,6 +22,8 @@ from geoalchemy2.shape import to_shape
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point
 
+from src.constants import EPSG
+
 
 __all__ = ["Base", "City", "State"]
 
@@ -72,7 +74,7 @@ GeoPoint = Annotated[
     mapped_column(
         Geometry(
             geometry_type="POINT",
-            srid=4326,
+            srid=EPSG,
             spatial_index=True,
         ),
         nullable=False,

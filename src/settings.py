@@ -27,7 +27,7 @@ class DatabaseSettings(BaseSettings):
     password: SecretStr
     database_name: SecretStr
     port: int = 5432
-    driver: str | None = "asyncpg"
+    driver: str | None = "psycopg"
 
     @field_validator("port", mode="before")
     @classmethod

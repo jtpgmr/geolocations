@@ -11,6 +11,7 @@ from src.models import (
     State as StateModel,
 )
 from src.schema import Base, Cities as CitiesTable, States as StatesTable
+from src.constants import _DEFAULT_TIMEOUT
 
 import httpx2
 from pydantic import BaseModel, Field, field_serializer, TypeAdapter
@@ -20,11 +21,6 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.dialects.postgresql.dml import Insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
-BASE = (
-    "https://tigerweb.geo.census.gov/arcgis/rest/services/"
-    "TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer"
-)
 
 BASE_URL: Final = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb"
 
@@ -133,7 +129,7 @@ TIGER_WEB_ENDPOINTS: list[TigerWebEndpoint] = [
 async def insert_locations_to_database(db: Database):
     async with (
         db.transaction(read_only=False) as session,
-        httpx2.AsyncClient(base_url=BASE_URL) as http_client,
+        httpx2.AsyncClient(base_url=BASE_URL, timeout=_DEFAULT_TIMEOUT) as http_client,
     ):
         for tw_endpoint in TIGER_WEB_ENDPOINTS:
             tw_endpoint: TigerWebEndpoint
