@@ -75,11 +75,11 @@ class TigerWebEndpoint(BaseModel):
 async def addStateToDatabase(session: AsyncSession, states: list[StateModel]) -> None:
     values: list[dict] = [state.to_orm() for state in states]
 
-    add_state_statement: Insert = insert(StatesTable).values(values)
+    add_state_statement: Insert = insert(StatesTable)
 
     add_state_statement = add_state_statement.on_conflict_do_nothing()
 
-    await session.execute(add_state_statement)
+    await session.execute(add_state_statement, values)
 
 
 async def addCityToDatabase(session: AsyncSession, cities: list[CityModel]) -> None:
@@ -105,7 +105,7 @@ async def addCityToDatabase(session: AsyncSession, cities: list[CityModel]) -> N
 
         values.append(city.to_orm(city_state_id))
 
-    add_city_statement: Insert = insert(CitiesTable).values(values)
+    add_city_statement: Insert = insert(CitiesTable)
 
     add_city_statement = add_city_statement.on_conflict_do_nothing(
         index_elements=["state_id", "name"]
@@ -124,14 +124,14 @@ class GeoTypes:
 
 
 TIGER_WEB_ENDPOINTS: list[TigerWebEndpoint] = [
-    # TigerWebEndpoint(
-    #     geotype=GeoTypes.STATE,
-    #     service="State_County",
-    #     layer=0,
-    #     params=TigerWebEndpointParams(
-    #         outFields=["BASENAME", "STATE", "STUSAB", "CENTLAT", "CENTLON"]
-    #     ),
-    # ),
+    TigerWebEndpoint(
+        geotype=GeoTypes.STATE,
+        service="State_County",
+        layer=0,
+        params=TigerWebEndpointParams(
+            outFields=["BASENAME", "STATE", "STUSAB", "CENTLAT", "CENTLON"]
+        ),
+    ),
     TigerWebEndpoint(
         geotype=GeoTypes.CITY,
         service="Places_CouSub_ConCity_SubMCD",
@@ -140,14 +140,14 @@ TIGER_WEB_ENDPOINTS: list[TigerWebEndpoint] = [
             outFields=["GEOID", "STATE", "BASENAME", "NAME", "CENTLAT", "CENTLON"]
         ),
     ),
-    # TigerWebEndpoint(
-    #     geotype=GeoTypes.CITY,
-    #     service="Places_CouSub_ConCity_SubMCD",
-    #     layer=5,
-    #     params=TigerWebEndpointParams(
-    #         outFields=["GEOID", "STATE", "BASENAME", "NAME", "CENTLAT", "CENTLON"]
-    #     ),
-    # ),
+    TigerWebEndpoint(
+        geotype=GeoTypes.CITY,
+        service="Places_CouSub_ConCity_SubMCD",
+        layer=5,
+        params=TigerWebEndpointParams(
+            outFields=["GEOID", "STATE", "BASENAME", "NAME", "CENTLAT", "CENTLON"]
+        ),
+    ),
 ]
 
 
