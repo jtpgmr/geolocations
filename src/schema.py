@@ -98,7 +98,10 @@ class States(LocationsSchema):
 
 class Cities(LocationsSchema):
     __tablename__ = "cities"
-    __table_args__ = (*LocationsSchema.__table_args__,)
+    __table_args__ = (
+        UniqueConstraint("state_id", "name", name="uq_state_id_city_name"),
+        *LocationsSchema.__table_args__,
+    )
 
     state_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey(f"{States.__table__}.id"), nullable=False

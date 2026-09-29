@@ -21,6 +21,8 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.dialects.postgresql.dml import Insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.constants import EPSG
+
 
 BASE_URL: Final = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb"
 
@@ -73,19 +75,43 @@ class TigerWebEndpoint(BaseModel):
 async def addStateToDatabase(session: AsyncSession, states: list[StateModel]) -> None:
     values: list[dict] = [state.to_orm() for state in states]
 
-    add_city_statement: Insert = insert(StatesTable).values(values)
+    add_state_statement: Insert = insert(StatesTable).values(values)
 
-    add_city_statement = add_city_statement.on_conflict_do_nothing()
+    add_state_statement = add_state_statement.on_conflict_do_nothing()
 
-    await session.execute(add_city_statement)
+    await session.execute(add_state_statement)
 
 
 async def addCityToDatabase(session: AsyncSession, cities: list[CityModel]) -> None:
-    values: list[dict] = [city.model_dump() for city in cities]
+    state_tigerweb_numbers = {city.state_tigerweb_number for city in cities}
+
+    result = await session.execute(
+        select(StatesTable).where(
+            StatesTable.tigerweb_number.in_(state_tigerweb_numbers)
+        )
+    )
+
+    states = result.scalars().all()
+
+    state_lookup = {state.tigerweb_number: state.id for state in states}
+
+    values: list[dict] = []
+
+    for city in cities:
+        city_state_id = state_lookup.get(city.state_tigerweb_number)
+
+        if not city_state_id:
+            continue
+
+        values.append(city.to_orm(city_state_id))
 
     add_city_statement: Insert = insert(CitiesTable).values(values)
 
-    # await session.execute(add_city_statement)
+    add_city_statement = add_city_statement.on_conflict_do_nothing(
+        index_elements=["state_id", "name"]
+    )
+
+    await session.execute(add_city_statement, values)
 
 
 class GeoTypes:
@@ -98,22 +124,22 @@ class GeoTypes:
 
 
 TIGER_WEB_ENDPOINTS: list[TigerWebEndpoint] = [
-    TigerWebEndpoint(
-        geotype=GeoTypes.STATE,
-        service="State_County",
-        layer=0,
-        params=TigerWebEndpointParams(
-            outFields=["BASENAME", "STATE", "STUSAB", "CENTLAT", "CENTLON"]
-        ),
-    ),
     # TigerWebEndpoint(
-    #     geotype=GeoTypes.CITY,
-    #     service="Places_CouSub_ConCity_SubMCD",
-    #     layer=4,
+    #     geotype=GeoTypes.STATE,
+    #     service="State_County",
+    #     layer=0,
     #     params=TigerWebEndpointParams(
-    #         outFields=["GEOID", "STATE", "BASENAME", "NAME", "CENTLAT", "CENTLON"]
+    #         outFields=["BASENAME", "STATE", "STUSAB", "CENTLAT", "CENTLON"]
     #     ),
     # ),
+    TigerWebEndpoint(
+        geotype=GeoTypes.CITY,
+        service="Places_CouSub_ConCity_SubMCD",
+        layer=4,
+        params=TigerWebEndpointParams(
+            outFields=["GEOID", "STATE", "BASENAME", "NAME", "CENTLAT", "CENTLON"]
+        ),
+    ),
     # TigerWebEndpoint(
     #     geotype=GeoTypes.CITY,
     #     service="Places_CouSub_ConCity_SubMCD",
@@ -150,8 +176,9 @@ async def insert_locations_to_database(db: Database):
                 for record in location_data
             ]
 
-            print(locations)
-            print(len(locations))
+            # raise Exception(locations)
+            # print(locations)
+            # print(len(locations))
 
             await tw_endpoint.geotype.db_handler(session, locations)
 

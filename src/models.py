@@ -1,4 +1,5 @@
 from __future__ import annotations
+from uuid import UUID
 from typing import Annotated
 from geoalchemy2.shape import to_shape
 from geoalchemy2 import Geometry, WKBElement
@@ -7,12 +8,10 @@ from shapely.geometry import Point
 from pydantic import (
     BaseModel,
     PositiveInt,
-    field_validator,
     Field,
-    TypeAdapter,
-    AliasChoices,
     ConfigDict,
     computed_field,
+    InstanceOf,
 )
 from pydantic_extra_types.coordinate import (
     Latitude as PydanticLatitude,
@@ -20,6 +19,7 @@ from pydantic_extra_types.coordinate import (
 )
 
 from src.schema import States
+from src.constants import EPSG
 
 __all__ = ["City", "County", "State"]
 # "BASENAME", "STATE", "STUSAB", "CENTLAT", "CENTLON"
@@ -28,7 +28,7 @@ Name = Annotated[str, Field(validation_alias="BASENAME")]
 Latitude = Annotated[PydanticLatitude, Field(validation_alias="CENTLAT")]
 Longitude = Annotated[PydanticLongitude, Field(validation_alias="CENTLON")]
 StateTigerWebNumber = Annotated[
-    str | int, Field(alias="state_number", validation_alias="STATE")
+    str, Field(alias="state_number", validation_alias="STATE")
 ]
 
 
@@ -46,18 +46,16 @@ class NearbyCitiesByCoordsSchema(BaseModel):
 
 
 class State(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     name: Name
-    abbreviation: Annotated[str, Field(validation_alias="STUSAB")]
+    abbreviation: str = Field(validation_alias="STUSAB")
     latitude: Latitude
     longitude: Longitude
-    tigerweb_number: StateTigerWebNumber
+    tigerweb_number: str = Field(alias="state_number", validation_alias="STATE")
 
     @computed_field
-    def geo_point(self) -> WKBElement:
+    def geo_point(self) -> InstanceOf[WKBElement]:
         # x = longitude, y = latitude
-        return from_shape(Point(self.longitude, self.latitude), srid=4326)
+        return from_shape(Point(self.longitude, self.latitude), srid=EPSG)
 
     def to_orm(self) -> dict:
         return {
@@ -80,9 +78,17 @@ class City(BaseModel):
     state_tigerweb_number: StateTigerWebNumber
     latitude: Latitude
     longitude: Longitude
-    tigerweb_number: str | int = Field(alias="city_number", validation_alias="GEOID")
-    # geo_location: str
+    tigerweb_number: str = Field(alias="city_number", validation_alias="GEOID")
 
-    # @field_validator("geo_location", mode="before")
-    # def turn_geo_location_into_wkt(cls, value):
-    #     return to_shape(value).wkt
+    @computed_field
+    def geo_point(self) -> InstanceOf[WKBElement]:
+        # x = longitude, y = latitude
+        return from_shape(Point(self.longitude, self.latitude), srid=EPSG)
+
+    def to_orm(self, state_id: UUID) -> dict:
+        return {
+            "state_id": state_id,
+            "name": self.city,
+            "tigerweb_number": self.tigerweb_number,
+            "geo_point": self.geo_point,
+        }
