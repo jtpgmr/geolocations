@@ -1,31 +1,25 @@
 from __future__ import annotations
-from typing import Annotated
 
-from enum import StrEnum
 import uuid
 from datetime import datetime as dt
+from enum import StrEnum
+from typing import Annotated
 
+from geoalchemy2 import Geometry, WKBElement
 from sqlalchemy import (
     DateTime,
-    Identity,
-    text,
-    Integer,
-    String,
-    SmallInteger,
-    UniqueConstraint,
     ForeignKey,
+    Identity,
+    String,
+    UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from geoalchemy2 import Geometry, WKBElement
-from geoalchemy2.shape import to_shape
-from geoalchemy2.shape import from_shape
-from shapely.geometry import Point
 
 from src.constants import EPSG
 
-
-__all__ = ["Base", "City", "State"]
+__all__ = ["Base", "Cities", "States"]
 
 
 class Base(DeclarativeBase):

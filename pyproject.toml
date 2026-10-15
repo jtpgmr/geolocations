@@ -28,3 +28,12 @@ dev = [
     "ruff>=0.16.8",
     "ty>=0.0.83",
 ]
+
+[tool.alembic]
+script_location = "alembic"
+prepend_sys_path = "."
+
+[tool.ruff]
+extend-exclude = [
+    "alembic/versions/"
+]

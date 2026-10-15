@@ -1,28 +1,27 @@
 import asyncio
-from collections.abc import Callable, Awaitable
-from src.settings import getSettings
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Final, TypeVar
-
-from src.database import Database
-from src.models import (
-    City as CityModel,
-    State as StateModel,
-)
-from src.schema import Base, Cities as CitiesTable, States as StatesTable
-from src.constants import _DEFAULT_TIMEOUT
+from typing import Final
 
 import httpx2
-from pydantic import BaseModel, Field, field_serializer, TypeAdapter
+from pydantic import BaseModel, Field, field_serializer
 from sqlalchemy import select
-
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.dialects.postgresql.dml import Insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.constants import EPSG
-
+from src.constants import _DEFAULT_TIMEOUT
+from src.database import Database
+from src.models import (
+    City as CityModel,
+)
+from src.models import (
+    State as StateModel,
+)
+from src.schema import Cities as CitiesTable
+from src.schema import States as StatesTable
+from src.settings import getSettings
 
 BASE_URL: Final = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb"
 

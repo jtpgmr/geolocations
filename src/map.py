@@ -1,28 +1,21 @@
-from geopandas.geodataframe import GeoDataFrame
-from contextlib import asynccontextmanager
 import asyncio
-from sqlalchemy import Select, select, inspect, create_engine, Engine
-from src.get_locations import insert_locations_to_database
-from src.settings import getSettings
-from src.database import Database
-
-import os
-import re
 from pathlib import Path
-import plotly.express as px
-
 
 import geopandas as gpd
 import httpx2
 import pandas as pd
-import pydeck as pdk
+import plotly.express as px
 import streamlit as st
-from shapely import wkb
+from geopandas.geodataframe import GeoDataFrame
+from sqlalchemy import Engine, Select, create_engine, select
 
-from src.schema import Base, Cities as CitiesTable, States as StatesTable
 from src.constants import _DEFAULT_TIMEOUT, EPSG
+from src.schema import States as StatesTable
+from src.settings import getSettings
 
-US_STATES_OUTLINES_URL = "https://raw.githubusercontent.com/PublicaMundi/MappingAPI"
+US_STATES_OUTLINES_BASE_URL = (
+    "https://raw.githubusercontent.com/PublicaMundi/MappingAPI"
+)
 
 
 @st.cache_resource
@@ -37,7 +30,7 @@ async def loadStateOutlines(
 ) -> gpd.GeoDataFrame:
     if not cache.exists():
         async with httpx2.AsyncClient(
-            base_url=US_STATES_OUTLINES_URL, timeout=_DEFAULT_TIMEOUT
+            base_url=US_STATES_OUTLINES_BASE_URL, timeout=_DEFAULT_TIMEOUT
         ) as http_client:
             data = await http_client.get("/master/data/geojson/us-states.json")
             cache.write_bytes(data=data.content)

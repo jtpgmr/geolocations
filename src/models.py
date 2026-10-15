@@ -1,24 +1,26 @@
 from __future__ import annotations
-from uuid import UUID
+
 from typing import Annotated
-from geoalchemy2.shape import to_shape
-from geoalchemy2 import Geometry, WKBElement
+from uuid import UUID
+
+from geoalchemy2 import WKBElement
 from geoalchemy2.shape import from_shape
-from shapely.geometry import Point
 from pydantic import (
     BaseModel,
-    PositiveInt,
     Field,
-    ConfigDict,
-    computed_field,
     InstanceOf,
+    PositiveInt,
+    computed_field,
 )
 from pydantic_extra_types.coordinate import (
     Latitude as PydanticLatitude,
+)
+from pydantic_extra_types.coordinate import (
     Longitude as PydanticLongitude,
 )
+from shapely.geometry import Point
 
-from src.schema import States
+# from src.schema import States
 from src.constants import EPSG
 
 __all__ = ["City", "County", "State"]
@@ -67,8 +69,7 @@ class State(BaseModel):
 
 
 # https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/1/query?outFields=GEOID%2CSTATE%2CCOUNTY%2CBASENAME%2CNAME%2CCENTLAT%2CCENTLON&returnGeometry=false&where=1%3D1&f=json
-class County(BaseModel):
-    """"""
+class County(BaseModel): ...
 
 
 class City(BaseModel):
