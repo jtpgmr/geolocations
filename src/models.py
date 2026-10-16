@@ -64,7 +64,6 @@ class GeoTypeModel(BaseModel, ABC):
     @abstractmethod
     def to_orm(self, **kwargs) -> dict:
         return {
-            # "state_id": state_id,
             "name": self.name,
             "tigerweb_number": self.tigerweb_number,
             "geo_point": self.geo_point,
@@ -86,11 +85,6 @@ class SubStateRegion(GeoTypeModel, ABC):
     state_tigerweb_number: StateTigerWebNumber
     latitude: Latitude
     longitude: Longitude
-
-    @computed_field
-    def geo_point(self) -> InstanceOf[WKBElement]:
-        # x = longitude, y = latitude
-        return from_shape(Point(self.longitude, self.latitude), srid=EPSG)
 
     def to_orm(self, **kwargs) -> dict:
         return {"state_id": kwargs["state_id"], **super().to_orm()}

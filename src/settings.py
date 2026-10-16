@@ -71,7 +71,7 @@ class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(**BASE_SETTINGS_CONFIG)
     env: Environment = Environment.DEV
 
-    db: DatabaseSettings = Field(default_factory=DatabaseSettings)  # type: ignore[arg-type]
+    db: DatabaseSettings = Field(default_factory=DatabaseSettings)
     logger: LoggerSettings = Field(default_factory=LoggerSettings)
 
 

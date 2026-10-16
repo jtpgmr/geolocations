@@ -45,8 +45,14 @@ class GeoType:
     model: type[BaseModel]
 
 
+COMMON_TIGER_WEB_OUT_FIELDS = ["BASENAME", "STATE", "CENTLAT", "CENTLON"]
+
+
 class TigerWebEndpointParams(BaseModel):
-    out_fields: list[str] = Field(alias="outFields")
+    out_fields: list[str] = Field(
+        default=COMMON_TIGER_WEB_OUT_FIELDS, alias="outFields"
+    )
+    # TODO: Expand data collection to account for polygon/boundary geometries
     return_geometry: bool = Field(default=False, alias="returnGeometry")
     where: str = "1=1"
     f: str = "json"
@@ -120,7 +126,7 @@ TIGER_WEB_ENDPOINTS: list[TigerWebEndpoint] = [
         service="State_County",
         layer=0,
         params=TigerWebEndpointParams(
-            outFields=["BASENAME", "STATE", "STUSAB", "CENTLAT", "CENTLON"]
+            outFields=[*COMMON_TIGER_WEB_OUT_FIELDS, "STUSAB"]
         ),
     ),
     TigerWebEndpoint(
@@ -128,7 +134,7 @@ TIGER_WEB_ENDPOINTS: list[TigerWebEndpoint] = [
         service="Places_CouSub_ConCity_SubMCD",
         layer=4,
         params=TigerWebEndpointParams(
-            outFields=["GEOID", "STATE", "BASENAME", "NAME", "CENTLAT", "CENTLON"]
+            outFields=[*COMMON_TIGER_WEB_OUT_FIELDS, "GEOID", "NAME"]
         ),
     ),
     TigerWebEndpoint(
@@ -136,7 +142,7 @@ TIGER_WEB_ENDPOINTS: list[TigerWebEndpoint] = [
         service="Places_CouSub_ConCity_SubMCD",
         layer=5,
         params=TigerWebEndpointParams(
-            outFields=["GEOID", "STATE", "BASENAME", "NAME", "CENTLAT", "CENTLON"]
+            outFields=[*COMMON_TIGER_WEB_OUT_FIELDS, "GEOID", "NAME"]
         ),
     ),
 ]
@@ -152,7 +158,7 @@ async def addLocationsToDatabase(db: Database):
             tw_endpoint: TigerWebEndpoint
 
             endpoint = generateEndpoint(tw_endpoint.service, tw_endpoint.layer)
-            params = tw_endpoint.params.model_dump(by_alias=True)
+            params: dict = tw_endpoint.params.model_dump(by_alias=True)
 
             response = await http_client.get(endpoint, params=params)
             response.raise_for_status()
@@ -165,8 +171,6 @@ async def addLocationsToDatabase(db: Database):
                 tw_endpoint.geotype.model.model_validate(record)
                 for record in location_data
             ]
-
-            print(locations[0])
 
             await tw_endpoint.geotype.db_handler(session, locations)
 

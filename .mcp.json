@@ -1,0 +1,52 @@
+{
+  "mcpServers": {
+    "postgres-mcp": {
+      "command": "uvx",
+      "args": [
+        "--with",
+        "mcp<2",
+        "postgres-mcp",
+        "--access-mode=unrestricted"
+      ],
+      "env": {
+        "DATABASE_URI": "postgresql://${DB__USER:-postgres}:${DB__PASSWORD:-postgres}@${DB__HOST:-localhost}:${DB__PORT:-5432}/${DB__DATABASE_NAME:-postgres}"
+      }
+    },
+    "microsoft-vscode-pgsql": {
+      "_details": "connection configs found at ~/.postgres-mcp/connections.yaml; quickstart found at https://www.npmjs.com/package/@microsoft/postgres-mcp#quick-start",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@microsoft/postgres-mcp",
+        "run"
+      ],
+      "env": {
+        "POSTGRES_MCP_CONNECTION_STRING": "postgresql://${DB__USER:-postgres}:${DB__PASSWORD:-postgres}@${DB__HOST:-localhost}:${DB__PORT:-5432}/${DB__DATABASE_NAME:-postgres}",
+        "POSTGRES_MCP_PROFILE_NAME": "geolocations"
+      }
+    },
+    "firecrawl": {
+      "type": "http",
+      "url": "https://mcp.firecrawl.dev/v2/mcp-oauth"
+    },
+    "exa": {
+      "type": "http",
+      "url": "https://mcp.exa.ai/mcp"
+    },
+    "mcpdoc": {
+      "command": "uvx",
+      "args": [
+        "--with",
+        "mcp<2.0.0",
+        "--from",
+        "mcpdoc",
+        "mcpdoc",
+        "--yaml",
+        ".agents/llms_txt.yaml",
+        "--follow-redirects",
+        "--transport",
+        "stdio"
+      ]
+    }
+  }
+}

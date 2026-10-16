@@ -1,0 +1,47 @@
+- name: Pydantic Validation Libraries
+  llms_txt: https://pydantic.dev/docs/validation/latest/llms-full.txt
+
+- name: Pydantic `httpx2`
+  llms_txt: https://pydantic.dev/docs/httpx2/llms-full.txt
+
+- name: Docker
+  llms_txt: https://docs.docker.com/llms.txt
+
+- name: OpenRouter
+  llms_txt: https://openrouter.ai/llms.txt
+
+- name: Astral.sh Ruff
+  llms_txt: https://docs.astral.sh/ruff/llms.txt
+
+- name: Astral.sh Ty
+  llms_txt: https://docs.astral.sh/ty/llms.txt
+
+- name: Streamlit
+  llms_txt: https://docs.streamlit.io/llms-full.txt
+
+- name: Plotly
+  llms_txt: https://plotly.com/llms.txt
+
+- name: Context7's Alembic llms.txt
+  llms_txt: https://context7.com/sqlalchemy/alembic/llms.txt
+
+- name: Context7's FastAPI llms.txt
+  llms_txt: https://context7.com/websites/fastapi_tiangolo/llms.txt
+
+- name: Context7's Pandas llms.txt
+  llms_txt: https://context7.com/pandas-dev/pandas/llms.txt
+
+- name: Context7's Geoalchemy2 llms.txt
+  llms_txt: https://context7.com/geoalchemy/geoalchemy2/llms.txt
+
+- name: Context7's Geopandas llms.txt
+  llms_txt: https://context7.com/geopandas/geopandas/llms.txt
+
+- name: Context7's SQLAlchemy llms.txt
+  llms_txt: https://context7.com/sqlalchemy/sqlalchemy/llms.txt
+
+- name: Context7's Structlog llms.txt
+  llms_txt: https://context7.com/websites/structlog_en_stable/llms.txt
+
+- name: Context7's Uvicorn llms.txt
+  llms_txt: https://context7.com/websites/uvicorn_dev/llms.txt
