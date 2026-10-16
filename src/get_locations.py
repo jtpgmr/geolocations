@@ -1,7 +1,6 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import Final
 
 import httpx2
@@ -13,7 +12,7 @@ from sqlalchemy.dialects.postgresql.dml import Insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from structlog import getLogger
 
-from src.constants import _DEFAULT_TIMEOUT
+from src.constants import _DEFAULT_TIMEOUT, GEO_TYPE_ORDER, GeoTypeNames
 from src.database import Database
 from src.models import (
     City as CityModel,
@@ -36,17 +35,6 @@ def generateEndpoint(service: str, layer: int | str) -> str:
 
 def generateURL(service: str, layer: int | str) -> str:
     return f"{BASE_URL}{generateEndpoint(service, layer)}"
-
-
-class GeoTypeNames(StrEnum):
-    CITY = "city"
-    STATE = "state"
-
-
-GEO_TYPE_ORDER = {
-    GeoTypeNames.STATE: 0,
-    GeoTypeNames.CITY: 1,
-}
 
 
 @dataclass
@@ -106,7 +94,7 @@ async def addCityToDatabase(session: AsyncSession, cities: list[CityModel]) -> N
         if not city_state_id:
             continue
 
-        values.append(city.to_orm(city_state_id))
+        values.append(city.to_orm(state_id=city_state_id))
 
     add_city_statement: Insert = insert(CitiesTable)
 
@@ -177,6 +165,8 @@ async def addLocationsToDatabase(db: Database):
                 tw_endpoint.geotype.model.model_validate(record)
                 for record in location_data
             ]
+
+            print(locations[0])
 
             await tw_endpoint.geotype.db_handler(session, locations)
 

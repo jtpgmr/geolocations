@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from typing import Annotated
-from uuid import UUID
 
 from geoalchemy2 import WKBElement
 from geoalchemy2.shape import from_shape
@@ -20,8 +20,7 @@ from pydantic_extra_types.coordinate import (
 )
 from shapely.geometry import Point
 
-# from src.schema import States
-from src.constants import EPSG
+from src.constants import EPSG, GeoTypeNames
 
 __all__ = ["City", "County", "State"]
 # "BASENAME", "STATE", "STUSAB", "CENTLAT", "CENTLON"
@@ -32,6 +31,10 @@ Longitude = Annotated[PydanticLongitude, Field(validation_alias="CENTLON")]
 StateTigerWebNumber = Annotated[
     str, Field(alias="state_number", validation_alias="STATE")
 ]
+TigerWebNumber = lambda alias_geotype, validation_alias="GEOID": Field(
+    alias=f"{alias_geotype}_number",
+    validation_alias=validation_alias,
+)
 
 
 class NearbyCitiesSchema(BaseModel):
@@ -47,62 +50,59 @@ class NearbyCitiesByCoordsSchema(BaseModel):
     km_within: PositiveInt
 
 
-class State(BaseModel):
+class GeoTypeModel(BaseModel, ABC):
     name: Name
-    abbreviation: str = Field(validation_alias="STUSAB")
     latitude: Latitude
     longitude: Longitude
-    tigerweb_number: StateTigerWebNumber
+    tigerweb_number: str
 
     @computed_field
     def geo_point(self) -> InstanceOf[WKBElement]:
         # x = longitude, y = latitude
         return from_shape(Point(self.longitude, self.latitude), srid=EPSG)
 
-    def to_orm(self) -> dict:
+    @abstractmethod
+    def to_orm(self, **kwargs) -> dict:
         return {
+            # "state_id": state_id,
             "name": self.name,
-            "abbreviation": self.abbreviation,
             "tigerweb_number": self.tigerweb_number,
             "geo_point": self.geo_point,
         }
 
 
-# TODO: Shared Class for County and City
-class SubStateRegion(BaseModel): ...
+class State(GeoTypeModel):
+    abbreviation: str = Field(validation_alias="STUSAB")
+    tigerweb_number: str = TigerWebNumber(
+        GeoTypeNames.STATE.lower(), GeoTypeNames.STATE.upper()
+    )
+
+    def to_orm(self, **kwargs) -> dict:
+        return {"abbreviation": self.abbreviation, **super().to_orm()}
+
+
+# Shared Class for County and City
+class SubStateRegion(GeoTypeModel, ABC):
+    state_tigerweb_number: StateTigerWebNumber
+    latitude: Latitude
+    longitude: Longitude
+
+    @computed_field
+    def geo_point(self) -> InstanceOf[WKBElement]:
+        # x = longitude, y = latitude
+        return from_shape(Point(self.longitude, self.latitude), srid=EPSG)
+
+    def to_orm(self, **kwargs) -> dict:
+        return {"state_id": kwargs["state_id"], **super().to_orm()}
 
 
 # https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/1/query?outFields=GEOID%2CSTATE%2CCOUNTY%2CBASENAME%2CNAME%2CCENTLAT%2CCENTLON&returnGeometry=false&where=1%3D1&f=json
-class County(BaseModel):
-    county: Name
-
-    state_tigerweb_number: StateTigerWebNumber
-    latitude: Latitude
-    longitude: Longitude
-
-    tigerweb_number: str = Field(alias="county_number", validation_alias="GEOID")
+# TODO: use geolocational data to map city-county mapping with data from us_cities.csv file
+class County(SubStateRegion):
+    # county: Name
+    tigerweb_number: str = TigerWebNumber(GeoTypeNames.COUNTY)
 
 
-class City(BaseModel):
-    city: Name
-
-    state_tigerweb_number: StateTigerWebNumber
-    latitude: Latitude
-    longitude: Longitude
-
-    tigerweb_number: str = Field(alias="city_number", validation_alias="GEOID")
-    # TODO: use geolocational data to map city-county mapping with data from us_cities.csv file
-    # county: str
-
-    @computed_field
-    def geo_point(self) -> InstanceOf[WKBElement]:
-        # x = longitude, y = latitude
-        return from_shape(Point(self.longitude, self.latitude), srid=EPSG)
-
-    def to_orm(self, state_id: UUID) -> dict:
-        return {
-            "state_id": state_id,
-            "name": self.city,
-            "tigerweb_number": self.tigerweb_number,
-            "geo_point": self.geo_point,
-        }
+class City(SubStateRegion):
+    # city: Name
+    tigerweb_number: str = TigerWebNumber(GeoTypeNames.CITY)
