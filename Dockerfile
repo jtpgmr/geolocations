@@ -17,7 +17,7 @@ RUN apt-get update && apt-get -y upgrade
 #     POETRY_NO_INTERACTION=1 \
 #     POETRY_VERSION=1.5.1
 
-EXPOSE 8000
+# EXPOSE 8000
 
 WORKDIR /opt/geolocations
 
@@ -31,3 +31,4 @@ RUN uv export --format requirements-txt -o requirements.txt
 RUN pip install --no-deps -r requirements.txt
 
 COPY . .
+

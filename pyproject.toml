@@ -19,6 +19,7 @@ dependencies = [
     "pydeck>=0.9.3",
     "sqlalchemy[asyncio]>=2.0.54",
     "streamlit>=1.64.0",
+    "structlog>=26.1.0",
     "uvicorn>=0.53.0",
 ]
 

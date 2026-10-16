@@ -49,9 +49,7 @@ class UpdatableMixin:
     """Mixin for mutable tables; modified_* stamped by DB trigger on UPDATE."""
 
     modified_at: Mapped[dt | None] = mapped_column(DateTime(timezone=True))
-    modified_by: Mapped[str | None] = mapped_column(
-        nullable=True, server_default=text("CURRENT_USER::regrole")
-    )
+    modified_by: Mapped[str | None] = mapped_column(nullable=True)
 
 
 class Schema(StrEnum):

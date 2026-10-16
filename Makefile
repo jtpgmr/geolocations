@@ -2,9 +2,11 @@
 PATHS					?=	alembic src
 OUTPUT_FORMAT			?=	concise
 RUN						?=	uv run
-UV_PYTHON				?= $(shell uv python find --show-version)
 SYNC_FLAGS				?=	--all-groups
 FIX_FLAG				= --fix
+
+PY_VERSION				?= $(shell uv python find --show-version)
+UV_ALEMBIC				:= $(RUN) alembic
 
 DEFAULT_ASTRAL_FLAGS	?=	--output-format=$(OUTPUT_FORMAT)
 
@@ -12,7 +14,7 @@ RUFF_CHECK_FLAGS		?=	$(DEFAULT_ASTRAL_FLAGS)
 RUFF_FORMAT_FLAGS		?=	$(DEFAULT_ASTRAL_FLAGS) --check
 TY_FLAGS				?=	$(DEFAULT_ASTRAL_FLAGS) --error-on-warning
 
-.PHONY: help init install setup lint-check lint format-check format type-check type-fix check fix clean
+.PHONY: help init install setup lint-check lint format-check format type-check type-fix check fix clean alembic-history alembic-check alembic-heads
 
 help:
 	@printf '%s\n' \
@@ -34,7 +36,7 @@ init: pyproject.toml
 	@echo "Project is initialized at $(abspath pyproject.toml)."
 
 pyproject.toml:
-	uv init --python "$(UV_PYTHON)"
+	uv init --python "$(PY_VERSION)"
 
 install:
 	uv sync $(SYNC_FLAGS)
@@ -67,3 +69,18 @@ clean:
 	find . -type d -name "__pycache__" -prune -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 	rm -rf .ruff_cache
+
+alembic-history:
+	$(UV_ALEMBIC) history --verbose
+
+alembic-check:
+	$(UV_ALEMBIC) check
+
+alembic-heads:
+	$(UV_ALEMBIC) heads -v
+
+alembic-current:
+	$(UV_ALEMBIC) current
+
+alembic-up:
+	$(UV_ALEMBIC) upgrade $(or $(revision),head)

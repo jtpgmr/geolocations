@@ -1,18 +1,26 @@
 services:
-  web:
+  geo-backend:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: geolocations-backend
-    ports:
-      - "8000:8000"
+    environment:
+      DB__DATABASE_NAME: ${DB__DATABASE_NAME:-postgres}
+      DB__USER: ${DB__USER:-postgres}
+      DB__PASSWORD: ${DB__PASSWORD:-postgres}
+      DB__PORT: ${DB__PORT:-5432}
+      DB__HOST: ${DB__HOST:-geo-db}
+    # ports:
+    #   - "8000:8000"
     volumes:
       - .:/opt/geolocations
     depends_on:
-      - db
-    command: uvicorn main:app --host=0.0.0.0 --port=8000 --reload
+      geo-db-migration-worker:
+        condition: service_completed_successfully
+    # command: uvicorn main:app --host=0.0.0.0 --port=8000 --reload
+    command: uv run -m src.get_locations
 
-  db:
+  geo-db:
     image: postgis/postgis:15-3.4-alpine
     container_name: geolocations-postgres
     restart: always
@@ -24,6 +32,31 @@ services:
       - ${DB__PORT:-5432}:5432
     volumes:
       - postgres_data:/var/lib/postgresql/data/
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -h 127.0.0.1 -p ${DB__PORT:-5432} -U ${DB__USER:-postgres} -d ${DB__DATABASE_NAME:-postgres}
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    
+  geo-db-migration-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: geolocations-migration
+    environment:
+      DB__DATABASE_NAME: ${DB__DATABASE_NAME:-postgres}
+      DB__USER: ${DB__USER:-postgres}
+      DB__PASSWORD: ${DB__PASSWORD:-postgres}
+      DB__PORT: ${DB__PORT:-5432}
+      DB__HOST: ${DB__HOST:-geo-db}
+    depends_on:
+      geo-db:
+        condition: service_healthy
+    command: uv run --no-sync alembic upgrade head
+  
 
 volumes:
   postgres_data:

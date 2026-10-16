@@ -52,7 +52,7 @@ class State(BaseModel):
     abbreviation: str = Field(validation_alias="STUSAB")
     latitude: Latitude
     longitude: Longitude
-    tigerweb_number: str = Field(alias="state_number", validation_alias="STATE")
+    tigerweb_number: StateTigerWebNumber
 
     @computed_field
     def geo_point(self) -> InstanceOf[WKBElement]:
@@ -68,18 +68,31 @@ class State(BaseModel):
         }
 
 
+# TODO: Shared Class for County and City
+class SubStateRegion(BaseModel): ...
+
+
 # https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/1/query?outFields=GEOID%2CSTATE%2CCOUNTY%2CBASENAME%2CNAME%2CCENTLAT%2CCENTLON&returnGeometry=false&where=1%3D1&f=json
-class County(BaseModel): ...
+class County(BaseModel):
+    county: Name
+
+    state_tigerweb_number: StateTigerWebNumber
+    latitude: Latitude
+    longitude: Longitude
+
+    tigerweb_number: str = Field(alias="county_number", validation_alias="GEOID")
 
 
 class City(BaseModel):
     city: Name
-    # TODO: use geolocational data to map city-county mapping with data from us_cities.csv file
-    # county: str
+
     state_tigerweb_number: StateTigerWebNumber
     latitude: Latitude
     longitude: Longitude
+
     tigerweb_number: str = Field(alias="city_number", validation_alias="GEOID")
+    # TODO: use geolocational data to map city-county mapping with data from us_cities.csv file
+    # county: str
 
     @computed_field
     def geo_point(self) -> InstanceOf[WKBElement]:

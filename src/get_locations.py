@@ -5,11 +5,13 @@ from enum import StrEnum
 from typing import Final
 
 import httpx2
+import structlog
 from pydantic import BaseModel, Field, field_serializer
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.dialects.postgresql.dml import Insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from structlog import getLogger
 
 from src.constants import _DEFAULT_TIMEOUT
 from src.database import Database
@@ -23,14 +25,16 @@ from src.schema import Cities as CitiesTable
 from src.schema import States as StatesTable
 from src.settings import getSettings
 
+logger: structlog.stdlib.BoundLogger = getLogger(__name__)
+
 BASE_URL: Final = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb"
 
 
-def generateEndpoint(service: str, layer: int | str):
+def generateEndpoint(service: str, layer: int | str) -> str:
     return f"/{service}/MapServer/{layer}/query"
 
 
-def generateURL(service: str, layer: int | str):
+def generateURL(service: str, layer: int | str) -> str:
     return f"{BASE_URL}{generateEndpoint(service, layer)}"
 
 
@@ -150,8 +154,8 @@ TIGER_WEB_ENDPOINTS: list[TigerWebEndpoint] = [
 ]
 
 
-# TODO: release prints with logs
-async def insert_locations_to_database(db: Database):
+# TODO: replace prints with logs
+async def addLocationsToDatabase(db: Database):
     async with (
         db.transaction(read_only=False) as session,
         httpx2.AsyncClient(base_url=BASE_URL, timeout=_DEFAULT_TIMEOUT) as http_client,
@@ -164,7 +168,6 @@ async def insert_locations_to_database(db: Database):
 
             response = await http_client.get(endpoint, params=params)
             response.raise_for_status()
-            print(response.url)
 
             location_data: list[dict] = [
                 feature["attributes"] for feature in response.json()["features"]
@@ -175,18 +178,27 @@ async def insert_locations_to_database(db: Database):
                 for record in location_data
             ]
 
-            # raise Exception(locations)
-            # print(locations)
-            # print(len(locations))
-
             await tw_endpoint.geotype.db_handler(session, locations)
+
+            logger.info(
+                "addLocationsToDatabase",
+                count=len(locations),
+                geotype=tw_endpoint.geotype.name,
+                api_service=tw_endpoint.service,
+            )
 
 
 if __name__ == "__main__":
+    from .settings import configureLogging
+
+    settings = getSettings()
+
+    configureLogging(settings)
+
     TIGER_WEB_ENDPOINTS.sort(key=lambda endpoint: GEO_TYPE_ORDER[endpoint.geotype.name])
 
     db_url = getSettings().db.dsn
     db = Database(db_url)
     db.connect()
 
-    asyncio.run(insert_locations_to_database(db))
+    asyncio.run(addLocationsToDatabase(db))

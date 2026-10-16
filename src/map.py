@@ -48,8 +48,12 @@ async def loadStateOutlines(
 def loadStateCentroidPoints(_engine: Engine) -> pd.DataFrame:
     get_states_statement: Select = select(*StatesTable.__table__.c)
 
+    sql = str(
+        get_states_statement.compile(_engine, compile_kwargs={"literal_binds": True})
+    )
+
     dataframe: gpd.GeoDataFrame = gpd.read_postgis(
-        get_states_statement, _engine, geom_col="geo_point"
+        sql=sql, con=_engine, geom_col="geo_point"
     )
 
     return dataframe.assign(lat=dataframe.geometry.y, lon=dataframe.geometry.x)
