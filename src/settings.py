@@ -16,6 +16,9 @@ from pydantic import (
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_DB_DEFAULTS = "postgres"
+
+
 BASE_SETTINGS_CONFIG = SettingsConfigDict(
     extra="ignore",
     case_sensitive=False,
@@ -34,9 +37,9 @@ class DatabaseSettings(BaseSettings):
     model_config = SettingsConfigDict({**BASE_SETTINGS_CONFIG, "env_prefix": "DB__"})
 
     host: SecretStr = SecretStr("localhost")
-    user: SecretStr = SecretStr("postgres")
-    password: SecretStr = SecretStr("postgres")
-    database_name: SecretStr = SecretStr("postgres")
+    user: SecretStr = SecretStr(_DB_DEFAULTS)
+    password: SecretStr = SecretStr(_DB_DEFAULTS)
+    database_name: SecretStr = SecretStr(_DB_DEFAULTS)
     port: int = 5432
     driver: str | None = "psycopg"
 

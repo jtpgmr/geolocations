@@ -53,7 +53,7 @@ def loadStateCentroidPoints(_engine: Engine) -> pd.DataFrame:
     )
 
     dataframe: gpd.GeoDataFrame = gpd.read_postgis(
-        sql=sql, con=_engine, geom_col="geo_point"
+        sql=sql, con=_engine, geom_col="centroid"
     )
 
     return dataframe.assign(lat=dataframe.geometry.y, lon=dataframe.geometry.x)

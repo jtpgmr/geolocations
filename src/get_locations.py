@@ -1,72 +1,41 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Final
 
-import httpx2
 import structlog
-from pydantic import BaseModel, Field, field_serializer
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.dialects.postgresql.dml import Insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from structlog import getLogger
 
-from src.constants import _DEFAULT_TIMEOUT, GEO_TYPE_ORDER, GeoTypeNames
-from src.database import Database
-from src.models import (
+from src.clients import TigerWebClient
+from src.clients.tigerweb.models import (
+    COMMON_TIGERWEB_OUT_FIELDS,
+    GeoTypeModel,
+    TigerWebEndpoint,
+    TigerWebEndpointParams,
+)
+from src.clients.tigerweb.models import (
     City as CityModel,
 )
-from src.models import (
+from src.clients.tigerweb.models import (
     State as StateModel,
 )
+from src.constants import GEO_TYPE_ORDER, GeoTypeNames
+from src.database import Database
 from src.schema import Cities as CitiesTable
 from src.schema import States as StatesTable
 from src.settings import getSettings
 
 logger: structlog.stdlib.BoundLogger = getLogger(__name__)
 
-BASE_URL: Final = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb"
-
-
-def generateEndpoint(service: str, layer: int | str) -> str:
-    return f"/{service}/MapServer/{layer}/query"
-
-
-def generateURL(service: str, layer: int | str) -> str:
-    return f"{BASE_URL}{generateEndpoint(service, layer)}"
-
 
 @dataclass
 class GeoType:
     name: GeoTypeNames
-    # db_table: type[Base]
     db_handler: Callable[[AsyncSession, list], Awaitable[None]]
-    model: type[BaseModel]
-
-
-COMMON_TIGER_WEB_OUT_FIELDS = ["BASENAME", "STATE", "CENTLAT", "CENTLON"]
-
-
-class TigerWebEndpointParams(BaseModel):
-    out_fields: list[str] = Field(
-        default=COMMON_TIGER_WEB_OUT_FIELDS, alias="outFields"
-    )
-    # TODO: Expand data collection to account for polygon/boundary geometries
-    return_geometry: bool = Field(default=False, alias="returnGeometry")
-    where: str = "1=1"
-    f: str = "json"
-
-    @field_serializer("out_fields")
-    def serialize_out_fields(self, out_fields) -> str:
-        return ",".join(out_fields)
-
-
-class TigerWebEndpoint(BaseModel):
-    geotype: GeoType
-    service: str
-    layer: str | int
-    params: TigerWebEndpointParams
+    model: type[GeoTypeModel]
 
 
 async def addStateToDatabase(session: AsyncSession, states: list[StateModel]) -> None:
@@ -120,65 +89,68 @@ class GeoTypes:
     )
 
 
-TIGER_WEB_ENDPOINTS: list[TigerWebEndpoint] = [
-    TigerWebEndpoint(
+@dataclass
+class TigerWebEndpointHandler:
+    endpoint: TigerWebEndpoint
+    geotype: GeoType
+
+
+TIGER_WEB_ENDPOINT_HANDLERS: list[TigerWebEndpointHandler] = [
+    TigerWebEndpointHandler(
         geotype=GeoTypes.STATE,
-        service="State_County",
-        layer=0,
-        params=TigerWebEndpointParams(
-            outFields=[*COMMON_TIGER_WEB_OUT_FIELDS, "STUSAB"]
+        endpoint=TigerWebEndpoint(
+            service="State_County",
+            layer=0,
+            params=TigerWebEndpointParams(
+                outFields=[*COMMON_TIGERWEB_OUT_FIELDS, "STUSAB"], returnGeometry=True
+            ),
         ),
     ),
-    TigerWebEndpoint(
-        geotype=GeoTypes.CITY,
-        service="Places_CouSub_ConCity_SubMCD",
-        layer=4,
-        params=TigerWebEndpointParams(
-            outFields=[*COMMON_TIGER_WEB_OUT_FIELDS, "GEOID", "NAME"]
-        ),
-    ),
-    TigerWebEndpoint(
-        geotype=GeoTypes.CITY,
-        service="Places_CouSub_ConCity_SubMCD",
-        layer=5,
-        params=TigerWebEndpointParams(
-            outFields=[*COMMON_TIGER_WEB_OUT_FIELDS, "GEOID", "NAME"]
-        ),
-    ),
+    # TigerWebEndpointHandler(
+    #     geotype=GeoTypes.CITY,
+    #     endpoint=TigerWebEndpoint(
+    #         service="Places_CouSub_ConCity_SubMCD",
+    #         layer=4,
+    #         params=TigerWebEndpointParams(
+    #             outFields=[*COMMON_TIGERWEB_OUT_FIELDS, "GEOID", "NAME"]
+    #         ),
+    #     ),
+    # ),
+    # TigerWebEndpointHandler(
+    #     geotype=GeoTypes.CITY,
+    #     endpoint=TigerWebEndpoint(
+    #         service="Places_CouSub_ConCity_SubMCD",
+    #         layer=5,
+    #         params=TigerWebEndpointParams(
+    #             outFields=[*COMMON_TIGERWEB_OUT_FIELDS, "GEOID", "NAME"]
+    #         ),
+    #     ),
+    # ),
 ]
 
 
-# TODO: replace prints with logs
 async def addLocationsToDatabase(db: Database):
     async with (
         db.transaction(read_only=False) as session,
-        httpx2.AsyncClient(base_url=BASE_URL, timeout=_DEFAULT_TIMEOUT) as http_client,
+        TigerWebClient() as http_client,
     ):
-        for tw_endpoint in TIGER_WEB_ENDPOINTS:
-            tw_endpoint: TigerWebEndpoint
+        for handler in TIGER_WEB_ENDPOINT_HANDLERS:
+            handler: TigerWebEndpointHandler
+            endpoint: TigerWebEndpoint = handler.endpoint
+            geotype: GeoType = handler.geotype
 
-            endpoint = generateEndpoint(tw_endpoint.service, tw_endpoint.layer)
-            params: dict = tw_endpoint.params.model_dump(by_alias=True)
+            locations: list[GeoTypeModel] = await http_client.getLocationsByGeoType(
+                endpoint.service, endpoint.layer, geotype.model, endpoint.params
+            )
 
-            response = await http_client.get(endpoint, params=params)
-            response.raise_for_status()
-
-            location_data: list[dict] = [
-                feature["attributes"] for feature in response.json()["features"]
-            ]
-
-            locations = [
-                tw_endpoint.geotype.model.model_validate(record)
-                for record in location_data
-            ]
-
-            await tw_endpoint.geotype.db_handler(session, locations)
+            # await geotype.db_handler(session, locations)
 
             logger.info(
                 "addLocationsToDatabase",
+                handler=geotype.db_handler.__name__,  # ty: ignore[unresolved-attribute]
                 count=len(locations),
-                geotype=tw_endpoint.geotype.name,
-                api_service=tw_endpoint.service,
+                geotype=geotype.name,
+                api_service=endpoint.service,
             )
 
 
@@ -189,7 +161,9 @@ if __name__ == "__main__":
 
     configureLogging(settings)
 
-    TIGER_WEB_ENDPOINTS.sort(key=lambda endpoint: GEO_TYPE_ORDER[endpoint.geotype.name])
+    TIGER_WEB_ENDPOINT_HANDLERS.sort(
+        key=lambda endpoint: GEO_TYPE_ORDER[endpoint.geotype.name]
+    )
 
     db_url = getSettings().db.dsn
     db = Database(db_url)

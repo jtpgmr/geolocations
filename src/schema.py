@@ -73,22 +73,54 @@ GeoPoint = Annotated[
     ),
 ]
 
+GeoMultiPolygon = Annotated[
+    WKBElement,
+    mapped_column(
+        Geometry(
+            geometry_type="MULTIPOLYGON",  # optional; this is the default
+            srid=EPSG,
+            spatial_index=True,
+        ),
+        nullable=False,
+    ),
+]
 
-class States(LocationsSchema):
+
+class GeoTypeMixin:
+    name: Mapped[str] = mapped_column(String(100))
+    tigerweb_number: Mapped[str | int] = mapped_column(String())
+
+
+class States(LocationsSchema, GeoTypeMixin):
     __tablename__ = "states"
     __table_args__ = (
         UniqueConstraint("abbreviation", name="uq_states_abbreviation"),
         UniqueConstraint("name", name="uq_states_name"),
         *LocationsSchema.__table_args__,
     )
+    abbreviation: Mapped[str] = mapped_column(String(length=2))
 
-    name: Mapped[str] = mapped_column(String(100))
-    abbreviation: Mapped[str] = mapped_column(String(2))
-    tigerweb_number: Mapped[str | int] = mapped_column(String())
-    geo_point: Mapped[GeoPoint]
+    # name: Mapped[str] = mapped_column(String(100))
+    # tigerweb_number: Mapped[str | int] = mapped_column(String())
+
+    # geo_point: Mapped[GeoPoint]
 
 
-class Cities(LocationsSchema):
+class StateGeometries(LocationsSchema):
+    __tablename__ = "state_geometries"
+    __table_args__ = (
+        UniqueConstraint("state_id", name="uq_state_geometries"),
+        *LocationsSchema.__table_args__,
+    )
+
+    state_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{States.__table__}.id"), nullable=False
+    )
+    centroid: Mapped[GeoPoint]
+    boundary: Mapped[GeoMultiPolygon]
+
+
+class Cities(LocationsSchema, GeoTypeMixin):
     __tablename__ = "cities"
     __table_args__ = (
         UniqueConstraint("state_id", "name", name="uq_state_id_city_name"),
@@ -98,15 +130,23 @@ class Cities(LocationsSchema):
     state_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey(f"{States.__table__}.id"), nullable=False
     )
-    name: Mapped[str] = mapped_column(String(100))
 
-    tigerweb_number: Mapped[str | int] = mapped_column(String())
-    geo_point: Mapped[GeoPoint]
+    # name: Mapped[str] = mapped_column(String(100))
+    # tigerweb_number: Mapped[str | int] = mapped_column(String())
+
+    # geo_point: Mapped[GeoPoint]
 
 
-class Counties(LocationsSchema):
+class Counties(LocationsSchema, GeoTypeMixin):
     __tablename__ = "counties"
-    __table_args__ = (*LocationsSchema.__table_args__,)
+    __table_args__ = (
+        UniqueConstraint("state_id", "name", name="uq_state_id_county_name"),
+        *LocationsSchema.__table_args__,
+    )
+
+    state_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{States.__table__}.id"), nullable=False
+    )
 
 
 class CountyCities(LocationsSchema):
@@ -118,7 +158,7 @@ class CountyCities(LocationsSchema):
     )
 
     county_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey(f"{States.__table__}.id"), nullable=False
+        ForeignKey(f"{Counties.__table__}.id"), nullable=False
     )
 
     city_id: Mapped[uuid.UUID] = mapped_column(
