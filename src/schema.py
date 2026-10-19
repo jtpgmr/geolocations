@@ -19,7 +19,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from src.constants import EPSG
 
-__all__ = ["Base", "Cities", "States"]
+__all__ = ["Base", "Cities", "States", "StateGeometries"]
 
 
 class Base(DeclarativeBase):

@@ -30,7 +30,7 @@
       "type": "http",
       "url": "https://mcp.exa.ai/mcp",
       "headers": {
-        "x-api-key": "Bearer ${EXA_API_KEY}"
+        "x-api-key": "${EXA_API_KEY}"
       }
     },
     "tavily": {
@@ -54,6 +54,13 @@
         "--transport",
         "stdio"
       ]
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      }
     }
   }
 }

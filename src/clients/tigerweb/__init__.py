@@ -8,7 +8,9 @@ import httpx2
 from src.clients.__base__ import AsyncHttpClient
 from src.clients.tigerweb.models import (
     GeoTypeModel,
+    LocationModel,
     TigerWebEndpointParams,
+    LocationGeometriesModel,
 )
 
 
@@ -46,9 +48,13 @@ class TigerWebClient:
             endpoint=endpoint, method=method, params=params, headers=headers
         )
 
-    def filterAPIQueryMetadata(self, response: httpx2.Response) -> list[dict]:
+    def filterAPIQueryMetadata(
+        self,
+        response: httpx2.Response,
+        model: type[LocationModel],
+    ) -> list[LocationModel]:
         """Filters `attributes` and `geometry` data from the TIGERweb API"""
-        location_data: list[dict] = []
+        location_data: list[LocationModel] = []
 
         for feature in response.json()["features"]:
             feature: dict
@@ -57,22 +63,19 @@ class TigerWebClient:
                 feature.get("geometry") or {},
             )
 
-            geometry["CENTLAT"] = attributes.pop("CENTLAT")
-            geometry["CENTLON"] = attributes.pop("CENTLON")
-            location_data.append(
-                {**feature.get("attributes"), **(feature.get("geometry") or {})}
-            )
+            data = (model or LocationModel).model_validate({**attributes, **geometry})
 
-        print(location_data[0])
+            location_data.append(data)
+
         return location_data
 
     async def getLocationsByGeoType(
         self,
         service: str,
         layer: int | str,
-        model: type[GeoTypeModel],
+        model: type[LocationModel],
         params: TigerWebEndpointParams,
-    ) -> list[GeoTypeModel]:
+    ) -> list[LocationModel]:
         endpoint = self._generateEndpoint(service, layer)
 
         if params.return_geometry and (
@@ -85,12 +88,6 @@ class TigerWebClient:
 
         response: httpx2.Response = await self.call(endpoint, params=params)
 
-        location_data = self.filterAPIQueryMetadata(response)
-
-        # location_data: list[dict] = [
-        #     feature["attributes"] for feature in response.json()["features"]
-        # ]
-
-        locations = [model.model_validate(record) for record in location_data]
+        locations = self.filterAPIQueryMetadata(response, model)
 
         return locations

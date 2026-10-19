@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from functools import reduce
 from collections.abc import Sequence
 from shapely import make_valid, symmetric_difference_all
@@ -31,11 +32,16 @@ __all__ = [
     "City",
     "County",
     "GeoTypeModel",
+    "LocationModel",
+    "LocationGeometriesModel",
     "State",
     "TigerWebEndpoint",
     "TigerWebEndpointParams",
 ]
 # "BASENAME", "STATE", "STUSAB", "CENTLAT", "CENTLON"
+
+logger: logging.Logger = logging.getLogger(__name__)
+
 
 Name = Annotated[str, Field(validation_alias="BASENAME")]
 CentroidLatitude = Annotated[PydanticLatitude, Field(validation_alias="CENTLAT")]
@@ -64,27 +70,34 @@ class NearbyCitiesByCoordsSchema(BaseModel):
 
 class GeoTypeModel(BaseModel, ABC):
     name: Name
-    latitude: CentroidLatitude
-    longitude: CentroidLongitude
+    # latitude: CentroidLatitude
+    # longitude: CentroidLongitude
     tigerweb_number: str
 
-    @computed_field
-    def geo_point(self) -> InstanceOf[WKBElement]:
-        # x = longitude, y = latitude
-        return from_shape(Point(self.longitude, self.latitude), srid=EPSG)
+    # @computed_field
+    # def geo_point(self) -> InstanceOf[WKBElement]:
+    #     # x = longitude, y = latitude
+    #     return from_shape(Point(self.longitude, self.latitude), srid=EPSG)
 
-    @abstractmethod
     def to_orm(self, **kwargs) -> dict:
         return {
             "name": self.name,
             "tigerweb_number": self.tigerweb_number,
-            "geo_point": self.geo_point,
+            # "geo_point": self.geo_point,
+        }
+
+    def toOrmAttributes(self, **kwargs) -> dict:
+        return {
+            "name": self.name,
+            "tigerweb_number": self.tigerweb_number,
+            # "geo_point": self.geo_point,
         }
 
 
 class LocationGeometriesModel(BaseModel, ABC):
     central_latitude: CentroidLatitude
     central_longitude: CentroidLongitude
+    rings: Sequence[Sequence[Sequence[float]]] | None
 
     @computed_field
     def centroid(self) -> InstanceOf[WKBElement]:
@@ -93,17 +106,34 @@ class LocationGeometriesModel(BaseModel, ABC):
             Point(self.central_longitude, self.central_latitude), srid=EPSG
         )
 
-    def ringsToMultiPolygon(
-        rings: Sequence[Sequence[Sequence[float]]],
-    ) -> MultiPolygon:
+    @computed_field
+    def boundary(
+        self,
+        # rings: Sequence[Sequence[Sequence[float]]],
+    ) -> InstanceOf[WKBElement] | None:
         """Convert ArcGIS polygon `rings` into a MultiPolygon.
 
         Rings are combined with the even-odd rule (symmetric difference), so holes
             are cut out of their shells regardless of winding order.
         """
-        polygons: list[Polygon] = [
-            make_valid(Polygon(ring)) for ring in rings if len(ring) >= 4
-        ]
+        if not self.rings:
+            return None
+
+        count_invalid_polygons: int = 0
+        # polygons: list[Polygon] = [
+        #     make_valid(Polygon(ring)) for ring in self.rings if len(ring) >= 4
+        # ]
+        polygons: list[Polygon] = []
+
+        for ring in self.rings:
+            if len(ring) >= 4:
+                polygons.append(make_valid(Polygon(ring)))
+                continue
+            count_invalid_polygons += 1
+
+        if count_invalid_polygons:
+            logger.warning(f"{count_invalid_polygons} invalid polygons found")
+
         if not polygons:
             raise ValueError("No usable rings (each needs at least 4 points)")
 
@@ -112,19 +142,30 @@ class LocationGeometriesModel(BaseModel, ABC):
         )
 
         if isinstance(shape, Polygon):
-            return MultiPolygon([shape])
-        if isinstance(shape, MultiPolygon):
-            return shape
-        raise ValueError(f"Rings did not produce a polygon: {shape.geom_type}")
+            shape = MultiPolygon([shape])
+        # if isinstance(shape, MultiPolygon):
+        #     return shape
+        return from_shape(shape, EPSG)
+
+    def toOrmGeometries(self, **kwargs) -> dict:
+        return {
+            "centroid": self.centroid,
+            "boundary": self.boundary,
+        }
 
 
-class State(GeoTypeModel):
+class LocationModel(GeoTypeModel, LocationGeometriesModel):
+    pass
+
+
+class State(LocationModel):
     abbreviation: str = Field(validation_alias="STUSAB")
-    tigerweb_number: str = TigerWebNumber(
-        GeoTypeNames.STATE.lower(), GeoTypeNames.STATE.upper()
-    )
+    # tigerweb_number: str = TigerWebNumber(
+    #     GeoTypeNames.STATE.lower(), GeoTypeNames.STATE.upper()
+    # )
+    tigerweb_number: StateTigerWebNumber
 
-    def to_orm(self, **kwargs) -> dict:
+    def toOrmAttributes(self, **kwargs) -> dict:
         return {"abbreviation": self.abbreviation, **super().to_orm()}
 
 

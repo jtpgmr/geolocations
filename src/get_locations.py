@@ -13,6 +13,7 @@ from src.clients import TigerWebClient
 from src.clients.tigerweb.models import (
     COMMON_TIGERWEB_OUT_FIELDS,
     GeoTypeModel,
+    LocationModel,
     TigerWebEndpoint,
     TigerWebEndpointParams,
 )
@@ -26,6 +27,7 @@ from src.constants import GEO_TYPE_ORDER, GeoTypeNames
 from src.database import Database
 from src.schema import Cities as CitiesTable
 from src.schema import States as StatesTable
+from src.schema import StateGeometries as StateGeometriesTable
 from src.settings import getSettings
 
 logger: structlog.stdlib.BoundLogger = getLogger(__name__)
@@ -35,17 +37,54 @@ logger: structlog.stdlib.BoundLogger = getLogger(__name__)
 class GeoType:
     name: GeoTypeNames
     db_handler: Callable[[AsyncSession, list], Awaitable[None]]
-    model: type[GeoTypeModel]
+    model: type[LocationModel]
 
 
 async def addStateToDatabase(session: AsyncSession, states: list[StateModel]) -> None:
-    values: list[dict] = [state.to_orm() for state in states]
+    attribute_values: list[dict] = [state.toOrmAttributes() for state in states]
 
     add_state_statement: Insert = insert(StatesTable)
 
     add_state_statement = add_state_statement.on_conflict_do_nothing()
 
-    await session.execute(add_state_statement, values)
+    await session.execute(add_state_statement, attribute_values)
+
+    tigerweb_numbers = {state.tigerweb_number for state in states}
+
+    result = await session.execute(
+        select(StatesTable.id, StatesTable.tigerweb_number).where(
+            StatesTable.tigerweb_number.in_(tigerweb_numbers)
+        )
+    )
+
+    state_id_lookup: dict[str, int] = {
+        tigerweb_number: state_id for state_id, tigerweb_number in result.all()
+    }
+
+    geometry_values: list[dict] = []
+
+    for state in states:
+        state_id = state_id_lookup.get(state.tigerweb_number)
+
+        if state_id is None:
+            logger.warning(
+                "state not found in db",
+                tigerweb_number=state.tigerweb_number,
+            )
+            continue
+
+        geometry_values.append({**state.toOrmGeometries(), "state_id": state_id})
+
+    if not geometry_values:
+        return
+
+    add_geometry_statement: Insert = insert(StateGeometriesTable)
+
+    add_geometry_statement = add_geometry_statement.on_conflict_do_nothing(
+        index_elements=["state_id"]
+    )
+
+    await session.execute(add_geometry_statement, geometry_values)
 
 
 async def addCityToDatabase(session: AsyncSession, cities: list[CityModel]) -> None:
@@ -81,9 +120,9 @@ async def addCityToDatabase(session: AsyncSession, cities: list[CityModel]) -> N
 
 
 class GeoTypes:
-    CITY = GeoType(
-        name=GeoTypeNames.CITY, db_handler=addCityToDatabase, model=CityModel
-    )
+    # CITY = GeoType(
+    #     name=GeoTypeNames.CITY, db_handler=addCityToDatabase, model=CityModel
+    # )
     STATE = GeoType(
         name=GeoTypeNames.STATE, db_handler=addStateToDatabase, model=StateModel
     )
@@ -139,11 +178,15 @@ async def addLocationsToDatabase(db: Database):
             endpoint: TigerWebEndpoint = handler.endpoint
             geotype: GeoType = handler.geotype
 
-            locations: list[GeoTypeModel] = await http_client.getLocationsByGeoType(
+            locations: list[LocationModel] = await http_client.getLocationsByGeoType(
                 endpoint.service, endpoint.layer, geotype.model, endpoint.params
             )
 
-            # await geotype.db_handler(session, locations)
+            # print(locations[0])
+            print(locations[0].toOrmAttributes())
+            print(locations[0].toOrmGeometries())
+
+            await geotype.db_handler(session, locations)
 
             logger.info(
                 "addLocationsToDatabase",
