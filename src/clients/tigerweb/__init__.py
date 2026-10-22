@@ -1,5 +1,4 @@
 from __future__ import annotations
-from src.constants import EPSG
 
 from typing import Final, Self
 
@@ -8,10 +7,11 @@ import httpx2
 from src.clients.__base__ import AsyncHttpClient
 from src.clients.tigerweb.models import (
     GeoTypeModel,
+    LocationGeometriesModel,
     LocationModel,
     TigerWebEndpointParams,
-    LocationGeometriesModel,
 )
+from src.constants import EPSG
 
 
 class TigerWebClient:

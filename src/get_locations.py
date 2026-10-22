@@ -12,7 +12,6 @@ from structlog import getLogger
 from src.clients import TigerWebClient
 from src.clients.tigerweb.models import (
     COMMON_TIGERWEB_OUT_FIELDS,
-    GeoTypeModel,
     LocationModel,
     TigerWebEndpoint,
     TigerWebEndpointParams,
@@ -26,8 +25,8 @@ from src.clients.tigerweb.models import (
 from src.constants import GEO_TYPE_ORDER, GeoTypeNames
 from src.database import Database
 from src.schema import Cities as CitiesTable
-from src.schema import States as StatesTable
 from src.schema import StateGeometries as StateGeometriesTable
+from src.schema import States as StatesTable
 from src.settings import getSettings
 
 logger: structlog.stdlib.BoundLogger = getLogger(__name__)

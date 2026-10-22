@@ -1,10 +1,9 @@
 from __future__ import annotations
-import logging
-from functools import reduce
-from collections.abc import Sequence
-from shapely import make_valid, symmetric_difference_all
 
-from abc import ABC, abstractmethod
+import logging
+from abc import ABC
+from collections.abc import Sequence
+from functools import reduce
 from typing import Annotated
 
 from geoalchemy2 import WKBElement
@@ -23,7 +22,8 @@ from pydantic_extra_types.coordinate import (
 from pydantic_extra_types.coordinate import (
     Longitude as PydanticLongitude,
 )
-from shapely.geometry import Point, MultiPolygon, Polygon
+from shapely import make_valid
+from shapely.geometry import MultiPolygon, Point, Polygon
 
 from src.constants import EPSG, GeoTypeNames
 
@@ -32,8 +32,8 @@ __all__ = [
     "City",
     "County",
     "GeoTypeModel",
-    "LocationModel",
     "LocationGeometriesModel",
+    "LocationModel",
     "State",
     "TigerWebEndpoint",
     "TigerWebEndpointParams",
@@ -120,9 +120,7 @@ class LocationGeometriesModel(BaseModel, ABC):
             return None
 
         count_invalid_polygons: int = 0
-        # polygons: list[Polygon] = [
-        #     make_valid(Polygon(ring)) for ring in self.rings if len(ring) >= 4
-        # ]
+
         polygons: list[Polygon] = []
 
         for ring in self.rings:
@@ -143,15 +141,11 @@ class LocationGeometriesModel(BaseModel, ABC):
 
         if isinstance(shape, Polygon):
             shape = MultiPolygon([shape])
-        # if isinstance(shape, MultiPolygon):
-        #     return shape
+
         return from_shape(shape, EPSG)
 
     def toOrmGeometries(self, **kwargs) -> dict:
-        return {
-            "centroid": self.centroid,
-            "boundary": self.boundary,
-        }
+        return {"centroid": self.centroid, "boundary": self.boundary}
 
 
 class LocationModel(GeoTypeModel, LocationGeometriesModel):
@@ -175,8 +169,8 @@ class SubStateRegion(GeoTypeModel, ABC):
     latitude: CentroidLatitude
     longitude: CentroidLongitude
 
-    def to_orm(self, **kwargs) -> dict:
-        return {"state_id": kwargs["state_id"], **super().to_orm()}
+    # def to_orm(self, **kwargs) -> dict:
+    #     return {"state_id": kwargs["state_id"], **super().to_orm()}
 
 
 # https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/1/query?outFields=GEOID%2CSTATE%2CCOUNTY%2CBASENAME%2CNAME%2CCENTLAT%2CCENTLON&returnGeometry=false&where=1%3D1&f=json

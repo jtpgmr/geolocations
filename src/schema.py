@@ -19,7 +19,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from src.constants import EPSG
 
-__all__ = ["Base", "Cities", "States", "StateGeometries"]
+__all__ = ["Base", "Cities", "StateGeometries", "States"]
 
 
 class Base(DeclarativeBase):
@@ -91,6 +91,11 @@ class GeoTypeMixin:
     tigerweb_number: Mapped[str | int] = mapped_column(String())
 
 
+class GeometriesMixin:
+    centroid: Mapped[GeoPoint]
+    boundary: Mapped[GeoMultiPolygon]
+
+
 class States(LocationsSchema, GeoTypeMixin):
     __tablename__ = "states"
     __table_args__ = (
@@ -100,13 +105,8 @@ class States(LocationsSchema, GeoTypeMixin):
     )
     abbreviation: Mapped[str] = mapped_column(String(length=2))
 
-    # name: Mapped[str] = mapped_column(String(100))
-    # tigerweb_number: Mapped[str | int] = mapped_column(String())
 
-    # geo_point: Mapped[GeoPoint]
-
-
-class StateGeometries(LocationsSchema):
+class StateGeometries(LocationsSchema, GeometriesMixin):
     __tablename__ = "state_geometries"
     __table_args__ = (
         UniqueConstraint("state_id", name="uq_state_geometries"),
@@ -116,8 +116,9 @@ class StateGeometries(LocationsSchema):
     state_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey(f"{States.__table__}.id"), nullable=False
     )
-    centroid: Mapped[GeoPoint]
-    boundary: Mapped[GeoMultiPolygon]
+
+
+class SubStateRegion: ...
 
 
 class Cities(LocationsSchema, GeoTypeMixin):
