@@ -74,7 +74,7 @@ alembic-history:
 	$(UV_ALEMBIC) history --verbose
 
 alembic-check:
-	$(UV_ALEMBIC) check
+	$(UV_ALEMBIC) check ; $(UV_ALEMBIC) upgrade head --sql
 
 alembic-heads:
 	$(UV_ALEMBIC) heads -v

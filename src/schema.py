@@ -1,31 +1,89 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime as dt
 from enum import StrEnum
-from typing import Annotated
 
 from geoalchemy2 import Geometry, WKBElement
 from sqlalchemy import (
+    Constraint,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Identity,
+    MetaData,
     String,
+    Table,
     UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
+from sqlalchemy.schema import ColumnCollectionConstraint
 
 from src.constants import EPSG
 
-__all__ = ["Base", "Cities", "StateGeometries", "States"]
+logger: logging.Logger = logging.getLogger(__name__)
+
+__all__ = [
+    "Base",
+    "Cities",
+    "CityGeometries",
+    "Counties",
+    "CountyCities",
+    "CountyGeometries",
+    "StateGeometries",
+    "States",
+]
+
+
+def setLocationsTableForeignKey(
+    fk_table: type[Base], nullable: bool = False
+) -> Mapped[uuid.UUID]:
+    return mapped_column(ForeignKey(f"{fk_table.__table__}.id"), nullable=nullable)
+
+
+def setUniqueConstraintName(constraint: Constraint, table: Table) -> str:
+    if isinstance(constraint, ColumnCollectionConstraint):
+        cols = [c.name for c in constraint.columns]
+        return cols[0] if len(cols) == 1 else "_".join(cols)
+
+    return constraint.table.name
+
+
+def setGeometryMappedColumn(
+    geometry_type: GeometryTypes, nullable: bool = False
+) -> Mapped[WKBElement]:
+    return mapped_column(
+        Geometry(
+            geometry_type=geometry_type,
+            srid=EPSG,
+            spatial_index=True,
+        ),
+        nullable=nullable,
+    )
+
+
+NAMING_CONVENTION = {
+    "uqConstraint": setUniqueConstraintName,
+    "pk": "pk_%(table_name)s",
+    # "ix": "ix_%(table_name)s_%(column_0_N_name)s",
+    "uq": "uq_%(table_name)s_%(uqConstraint)s",
+    "fk": "fk_%(table_name)s_%(column_0_N_name)s_%(referred_table_name)s",
+    # "ck": "ck_%(table_name)s_%(constraint_name)s",
+}
 
 
 class Base(DeclarativeBase):
     """Insert-only audit base."""
 
     __abstract__ = True
+    metadata = MetaData(naming_convention=NAMING_CONVENTION)
+
+    @declared_attr.directive
+    def __table_args__(cls) -> tuple:
+        return ()
 
     serial_id: Mapped[int] = mapped_column(
         Identity(always=True),
@@ -58,32 +116,13 @@ class Schema(StrEnum):
 
 class LocationsSchema(Base, UpdatableMixin):
     __abstract__ = True
-    __table_args__: tuple = ({"schema": Schema.LOCATIONS},)
+
+    __table_args__: tuple = ({"schema": Schema.LOCATIONS}, *Base.__table_args__)
 
 
-GeoPoint = Annotated[
-    WKBElement,
-    mapped_column(
-        Geometry(
-            geometry_type="POINT",
-            srid=EPSG,
-            spatial_index=True,
-        ),
-        nullable=False,
-    ),
-]
-
-GeoMultiPolygon = Annotated[
-    WKBElement,
-    mapped_column(
-        Geometry(
-            geometry_type="MULTIPOLYGON",  # optional; this is the default
-            srid=EPSG,
-            spatial_index=True,
-        ),
-        nullable=False,
-    ),
-]
+class GeometryTypes(StrEnum):
+    POINT = "POINT"
+    MULTIPOLYGON = "MULTIPOLYGON"
 
 
 class GeoTypeMixin:
@@ -92,76 +131,90 @@ class GeoTypeMixin:
 
 
 class GeometriesMixin:
-    centroid: Mapped[GeoPoint]
-    boundary: Mapped[GeoMultiPolygon]
+    centroid: Mapped[WKBElement] = setGeometryMappedColumn(GeometryTypes.POINT)
+    boundary: Mapped[WKBElement] = setGeometryMappedColumn(GeometryTypes.MULTIPOLYGON)
 
 
 class States(LocationsSchema, GeoTypeMixin):
     __tablename__ = "states"
     __table_args__ = (
-        UniqueConstraint("abbreviation", name="uq_states_abbreviation"),
-        UniqueConstraint("name", name="uq_states_name"),
+        UniqueConstraint("abbreviation"),
+        UniqueConstraint("name"),
         *LocationsSchema.__table_args__,
     )
+
     abbreviation: Mapped[str] = mapped_column(String(length=2))
 
 
-class StateGeometries(LocationsSchema, GeometriesMixin):
+class HasStateIdFkMixin:
+    state_id = setLocationsTableForeignKey(States)
+
+
+class StateGeometries(LocationsSchema, GeometriesMixin, HasStateIdFkMixin):
     __tablename__ = "state_geometries"
-    __table_args__ = (
-        UniqueConstraint("state_id", name="uq_state_geometries"),
-        *LocationsSchema.__table_args__,
-    )
-
-    state_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey(f"{States.__table__}.id"), nullable=False
-    )
+    __table_args__ = (UniqueConstraint("state_id"), *LocationsSchema.__table_args__)
 
 
-class SubStateRegion: ...
+class SubStateRegionTable(LocationsSchema, GeoTypeMixin, HasStateIdFkMixin):
+    __abstract__ = True
+
+    @declared_attr.directive
+    def __table_args__(cls) -> tuple:
+        return (
+            UniqueConstraint(
+                "state_id", "name", name=f"uq_{cls.__tablename__}_state_id_name"
+            ),
+            *LocationsSchema.__table_args__,
+        )
 
 
-class Cities(LocationsSchema, GeoTypeMixin):
+class Cities(SubStateRegionTable):
     __tablename__ = "cities"
-    __table_args__ = (
-        UniqueConstraint("state_id", "name", name="uq_state_id_city_name"),
-        *LocationsSchema.__table_args__,
-    )
-
-    state_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey(f"{States.__table__}.id"), nullable=False
-    )
-
-    # name: Mapped[str] = mapped_column(String(100))
-    # tigerweb_number: Mapped[str | int] = mapped_column(String())
-
-    # geo_point: Mapped[GeoPoint]
 
 
-class Counties(LocationsSchema, GeoTypeMixin):
+class CityGeometries(LocationsSchema, GeometriesMixin):
+    __tablename__ = "city_geometries"
+    __table_args__ = (UniqueConstraint("city_id"), *LocationsSchema.__table_args__)
+
+    city_id = setLocationsTableForeignKey(Cities)
+
+
+class Counties(SubStateRegionTable):
     __tablename__ = "counties"
-    __table_args__ = (
-        UniqueConstraint("state_id", "name", name="uq_state_id_county_name"),
-        *LocationsSchema.__table_args__,
-    )
 
-    state_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey(f"{States.__table__}.id"), nullable=False
-    )
+
+class CountyGeometries(LocationsSchema, GeometriesMixin):
+    __tablename__ = "county_geometries"
+    __table_args__ = (UniqueConstraint("county_id"), *LocationsSchema.__table_args__)
+
+    county_id = setLocationsTableForeignKey(Counties)
 
 
 class CountyCities(LocationsSchema):
     __tablename__ = "county_cities"
 
     __table_args__ = (
-        UniqueConstraint("county_id", "city_id", name="uq_county_city"),
+        UniqueConstraint("county_id", "city_id"),
         *LocationsSchema.__table_args__,
     )
 
-    county_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey(f"{Counties.__table__}.id"), nullable=False
-    )
+    county_id = setLocationsTableForeignKey(Counties)
 
-    city_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey(f"{Cities.__table__}.id"), nullable=False
-    )
+    city_id = setLocationsTableForeignKey(Cities)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
+    for table in Base.metadata.tables.values():
+        for constraint in table.constraints:
+            logger.debug(type(constraint))
+
+            if isinstance(constraint, (UniqueConstraint, ForeignKeyConstraint)):
+                logger.debug(
+                    "%s: %s. %s\n",
+                    table.fullname,
+                    constraint.name,
+                    [c.name for c in constraint.columns],
+                )
+
+    print("Registered tables:", list(Base.metadata.tables.keys()))
