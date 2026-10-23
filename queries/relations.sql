@@ -9,6 +9,24 @@ FROM locations.states s
 left join locations.state_geometries sg on s.id = sg.state_id ;
 
 
+SELECT c.name,
+       s.abbreviation,
+       c.state_id,
+       c.id,
+       c.name,
+       c.tigerweb_number,
+       cg.city_id,
+       cg.centroid,
+       cg.boundary
+FROM locations.cities c
+left join locations.city_geometries cg on c.id = cg.city_id
+left join locations.states s on s.id = c.state_id ;
+
+
+select count(*)
+from locations.cities;
+
+
 SELECT name,
        s.abbreviation,
        s.tigerweb_number,

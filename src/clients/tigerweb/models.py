@@ -22,10 +22,13 @@ from pydantic_extra_types.coordinate import (
 from pydantic_extra_types.coordinate import (
     Longitude as PydanticLongitude,
 )
-from shapely import make_valid
+from shapely import get_parts, make_valid, unary_union
 from shapely.geometry import MultiPolygon, Point, Polygon
 
 from src.constants import EPSG, GeoTypeNames
+
+logger: logging.Logger = logging.getLogger(__name__)
+
 
 __all__ = [
     "COMMON_TIGERWEB_OUT_FIELDS",
@@ -38,11 +41,8 @@ __all__ = [
     "TigerWebEndpoint",
     "TigerWebEndpointParams",
 ]
-# "BASENAME", "STATE", "STUSAB", "CENTLAT", "CENTLON"
 
-logger: logging.Logger = logging.getLogger(__name__)
-
-
+# TODO: Major refactor to include and distinguish both the FIPS code and GEOID
 Name = Annotated[str, Field(validation_alias="BASENAME")]
 CentroidLatitude = Annotated[PydanticLatitude, Field(validation_alias="CENTLAT")]
 CentroidLongitude = Annotated[PydanticLongitude, Field(validation_alias="CENTLON")]
@@ -70,34 +70,19 @@ class NearbyCitiesByCoordsSchema(BaseModel):
 
 class GeoTypeModel(BaseModel, ABC):
     name: Name
-    # latitude: CentroidLatitude
-    # longitude: CentroidLongitude
     tigerweb_number: str
-
-    # @computed_field
-    # def geo_point(self) -> InstanceOf[WKBElement]:
-    #     # x = longitude, y = latitude
-    #     return from_shape(Point(self.longitude, self.latitude), srid=EPSG)
-
-    def to_orm(self, **kwargs) -> dict:
-        return {
-            "name": self.name,
-            "tigerweb_number": self.tigerweb_number,
-            # "geo_point": self.geo_point,
-        }
 
     def toOrmAttributes(self, **kwargs) -> dict:
         return {
             "name": self.name,
             "tigerweb_number": self.tigerweb_number,
-            # "geo_point": self.geo_point,
         }
 
 
 class LocationGeometriesModel(BaseModel, ABC):
     central_latitude: CentroidLatitude
     central_longitude: CentroidLongitude
-    rings: Sequence[Sequence[Sequence[float]]] | None
+    rings: Sequence[Sequence[Sequence[float]]] | None = None
 
     @computed_field
     def centroid(self) -> InstanceOf[WKBElement]:
@@ -109,7 +94,6 @@ class LocationGeometriesModel(BaseModel, ABC):
     @computed_field
     def boundary(
         self,
-        # rings: Sequence[Sequence[Sequence[float]]],
     ) -> InstanceOf[WKBElement] | None:
         """Convert ArcGIS polygon `rings` into a MultiPolygon.
 
@@ -142,6 +126,19 @@ class LocationGeometriesModel(BaseModel, ABC):
         if isinstance(shape, Polygon):
             shape = MultiPolygon([shape])
 
+        if shape.geom_type == "GeometryCollection":
+            polygons = [
+                part
+                for part in get_parts(shape)
+                if isinstance(part, (Polygon, MultiPolygon))
+            ]
+
+            if not polygons:
+                raise ValueError("Geometry contains no polygons")
+
+            result = unary_union(polygons)
+            shape = MultiPolygon([result]) if isinstance(result, Polygon) else result
+
         return from_shape(shape, EPSG)
 
     def toOrmGeometries(self, **kwargs) -> dict:
@@ -154,23 +151,17 @@ class LocationModel(GeoTypeModel, LocationGeometriesModel):
 
 class State(LocationModel):
     abbreviation: str = Field(validation_alias="STUSAB")
-    # tigerweb_number: str = TigerWebNumber(
-    #     GeoTypeNames.STATE.lower(), GeoTypeNames.STATE.upper()
-    # )
     tigerweb_number: StateTigerWebNumber
 
     def toOrmAttributes(self, **kwargs) -> dict:
-        return {"abbreviation": self.abbreviation, **super().to_orm()}
+        return {"abbreviation": self.abbreviation, **super().toOrmAttributes()}
 
 
 # Shared Class for County and City
-class SubStateRegion(GeoTypeModel, ABC):
+class SubStateRegion(LocationModel, ABC):
     state_tigerweb_number: StateTigerWebNumber
     latitude: CentroidLatitude
     longitude: CentroidLongitude
-
-    # def to_orm(self, **kwargs) -> dict:
-    #     return {"state_id": kwargs["state_id"], **super().to_orm()}
 
 
 # https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/1/query?outFields=GEOID%2CSTATE%2CCOUNTY%2CBASENAME%2CNAME%2CCENTLAT%2CCENTLON&returnGeometry=false&where=1%3D1&f=json

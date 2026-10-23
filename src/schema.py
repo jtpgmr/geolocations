@@ -33,8 +33,10 @@ __all__ = [
     "Counties",
     "CountyCities",
     "CountyGeometries",
+    "GeometriesMixin",
     "StateGeometries",
     "States",
+    "SubStateRegionTableBase",
 ]
 
 
@@ -155,7 +157,7 @@ class StateGeometries(LocationsSchema, GeometriesMixin, HasStateIdFkMixin):
     __table_args__ = (UniqueConstraint("state_id"), *LocationsSchema.__table_args__)
 
 
-class SubStateRegionTable(LocationsSchema, GeoTypeMixin, HasStateIdFkMixin):
+class SubStateRegionTableBase(LocationsSchema, GeoTypeMixin, HasStateIdFkMixin):
     __abstract__ = True
 
     @declared_attr.directive
@@ -168,7 +170,7 @@ class SubStateRegionTable(LocationsSchema, GeoTypeMixin, HasStateIdFkMixin):
         )
 
 
-class Cities(SubStateRegionTable):
+class Cities(SubStateRegionTableBase):
     __tablename__ = "cities"
 
 
@@ -179,7 +181,7 @@ class CityGeometries(LocationsSchema, GeometriesMixin):
     city_id = setLocationsTableForeignKey(Cities)
 
 
-class Counties(SubStateRegionTable):
+class Counties(SubStateRegionTableBase):
     __tablename__ = "counties"
 
 
@@ -199,7 +201,6 @@ class CountyCities(LocationsSchema):
     )
 
     county_id = setLocationsTableForeignKey(Counties)
-
     city_id = setLocationsTableForeignKey(Cities)
 
 
