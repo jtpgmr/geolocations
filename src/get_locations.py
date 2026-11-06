@@ -50,10 +50,9 @@ class GeoType:
         Awaitable[None],
     ]
     model: type[LocationModel]
-    db_tables: (
-        tuple[type[GeoTypeMixin], type[GeometriesMixin], str, GeoTypeNames | None]
-        | None
-    ) = None
+    db_tables: tuple[type[GeoTypeMixin], type[GeometriesMixin], str, GeoTypeNames | None] | None = (
+        None
+    )
 
 
 async def addStateToDatabase(
@@ -134,7 +133,7 @@ async def addSubStateRegionToDatabase(
 
         values.append({**region.toOrmAttributes(), "state_id": region_state_id})
 
-    SubStateRegionTable = db_tables[0]
+    SubStateRegionTable = db_tables[0]  # noqa: N806
     add_region_statement: Insert = insert(SubStateRegionTable)
 
     add_region_statement = add_region_statement.on_conflict_do_nothing(
@@ -162,7 +161,7 @@ async def addSubStateRegionToDatabase(
     except IndexError:
         raise ValueError(
             "Missing foreign key input parameter for function `addSubStateRegionToDatabase`"
-        )
+        ) from None
 
     for region in substate_regions:
         region_id = region_id_lookup.get(region.tigerweb_number)
@@ -179,14 +178,12 @@ async def addSubStateRegionToDatabase(
             )
             continue
 
-        geometry_values.append(
-            {**region.toOrmGeometries(), base_to_geometries_table_fk: region_id}
-        )
+        geometry_values.append({**region.toOrmGeometries(), base_to_geometries_table_fk: region_id})
 
     if not geometry_values:
         return
 
-    GeometriesTable = db_tables[1]
+    GeometriesTable = db_tables[1]  # noqa: N806
     add_geometry_statement: Insert = insert(GeometriesTable)
 
     add_geometry_statement = add_geometry_statement.on_conflict_do_nothing(
@@ -227,7 +224,6 @@ class TigerWebEndpointHandler:
     geotype: GeoType
 
 
-# https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/1/query?outFields=GEOID%2CSTATE%2CCOUNTY%2CBASENAME%2CNAME%2CCENTLAT%2CCENTLON&returnGeometry=false&where=1%3D1&f=json
 TIGER_WEB_ENDPOINT_HANDLERS: list[TigerWebEndpointHandler] = [
     TigerWebEndpointHandler(
         geotype=GeoTypes.STATE,
@@ -313,9 +309,7 @@ if __name__ == "__main__":
 
     configureLogging(settings)
 
-    TIGER_WEB_ENDPOINT_HANDLERS.sort(
-        key=lambda endpoint: GEO_TYPE_ORDER[endpoint.geotype.name]
-    )
+    TIGER_WEB_ENDPOINT_HANDLERS.sort(key=lambda endpoint: GEO_TYPE_ORDER[endpoint.geotype.name])
 
     db_url = getSettings().db.dsn
     db = Database(db_url)

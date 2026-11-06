@@ -87,15 +87,11 @@ class Database:
             yield session
 
     @asynccontextmanager
-    async def transaction(
-        self, read_only: bool | None = True
-    ) -> AsyncIterator[AsyncSession]:
+    async def transaction(self, read_only: bool | None = True) -> AsyncIterator[AsyncSession]:
         async with self.session() as session, session.begin():
             try:
                 if read_only:
-                    await session.execute(
-                        text("SET TRANSACTION READ ONLY")
-                    )  # must be first
+                    await session.execute(text("SET TRANSACTION READ ONLY"))  # must be first
                     await session.execute(
                         text("SELECT set_config('statement_timeout', :timeout, true)"),
                         {"timeout": "10s"},

@@ -13,9 +13,7 @@ from src.constants import _DEFAULT_TIMEOUT, EPSG
 from src.schema import States as StatesTable
 from src.settings import getSettings
 
-US_STATES_OUTLINES_BASE_URL = (
-    "https://raw.githubusercontent.com/PublicaMundi/MappingAPI"
-)
+US_STATES_OUTLINES_BASE_URL = "https://raw.githubusercontent.com/PublicaMundi/MappingAPI"
 
 
 @st.cache_resource
@@ -48,13 +46,9 @@ async def loadStateOutlines(
 def loadStateCentroidPoints(_engine: Engine) -> pd.DataFrame:
     get_states_statement: Select = select(*StatesTable.__table__.c)
 
-    sql = str(
-        get_states_statement.compile(_engine, compile_kwargs={"literal_binds": True})
-    )
+    sql = str(get_states_statement.compile(_engine, compile_kwargs={"literal_binds": True}))
 
-    dataframe: gpd.GeoDataFrame = gpd.read_postgis(
-        sql=sql, con=_engine, geom_col="centroid"
-    )
+    dataframe: gpd.GeoDataFrame = gpd.read_postgis(sql=sql, con=_engine, geom_col="centroid")
 
     return dataframe.assign(lat=dataframe.geometry.y, lon=dataframe.geometry.x)
 

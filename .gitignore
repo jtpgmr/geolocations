@@ -141,3 +141,9 @@ cython_debug/
 
 # Duckdb tmp storag efiles
 .tmp/
+
+
+.notes/
+agno_ai
+.claude/
+.agents/skills/

@@ -148,9 +148,7 @@ class AsyncHttpClient:
                 request_headers["Authorization"] = f"Bearer {token}"
 
             try:
-                response = await client.request(
-                    method, url, params=params, headers=request_headers
-                )
+                response = await client.request(method, url, params=params, headers=request_headers)
             except httpx2.TransportError as exc:
                 retryable = isinstance(exc, _UNSENT_ERRORS)
                 if not retryable or attempt >= self._max_retries:
@@ -172,11 +170,7 @@ class AsyncHttpClient:
                 continue
 
             # 429 means the server rejected the request before processing it,
-            if (
-                status in _RETRYABLE_STATUS
-                and status == 429
-                and attempt < self._max_retries
-            ):
+            if status in _RETRYABLE_STATUS and status == 429 and attempt < self._max_retries:
                 retry_after = self._getRetryAfter(response)
                 delay = (
                     min(retry_after, _MAX_RETRY_AFTER)

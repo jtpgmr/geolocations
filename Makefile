@@ -2,7 +2,6 @@
 PATHS					?=	alembic src
 OUTPUT_FORMAT			?=	concise
 RUN						?=	uv run
-SYNC_FLAGS				?=	--all-groups
 FIX_FLAG				= --fix
 
 PY_VERSION				?= $(shell uv python find --show-version)
@@ -14,7 +13,7 @@ RUFF_CHECK_FLAGS		?=	$(DEFAULT_ASTRAL_FLAGS)
 RUFF_FORMAT_FLAGS		?=	$(DEFAULT_ASTRAL_FLAGS) --check
 TY_FLAGS				?=	$(DEFAULT_ASTRAL_FLAGS) --error-on-warning
 
-.PHONY: help init install setup lint-check lint format-check format type-check type-fix check fix clean alembic-history alembic-check alembic-heads
+.PHONY: help lint-check lint format-check format type-check type-fix check fix clean alembic-history alembic-check alembic-heads
 
 help:
 	@printf '%s\n' \
@@ -31,17 +30,6 @@ help:
 		'make fix				Sequentially runs `lint format type-fix` make commands' \
 		'make clean				Delete Python bytecode and tooling caches'
 
-
-init: pyproject.toml
-	@echo "Project is initialized at $(abspath pyproject.toml)."
-
-pyproject.toml:
-	uv init --python "$(PY_VERSION)"
-
-install:
-	uv sync $(SYNC_FLAGS)
-
-setup: init install
 
 lint-check:
 	$(RUN) ruff check $(RUFF_CHECK_FLAGS) $(PATHS)
@@ -82,5 +70,6 @@ alembic-heads:
 alembic-current:
 	$(UV_ALEMBIC) current
 
+alembic-up: override UV_ALEMBIC = $(RUN) --no-sync alembic
 alembic-up:
 	$(UV_ALEMBIC) upgrade $(or $(revision),head)

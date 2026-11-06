@@ -14,7 +14,6 @@ from sqlalchemy import (
     Identity,
     MetaData,
     String,
-    Table,
     UniqueConstraint,
     text,
 )
@@ -40,13 +39,11 @@ __all__ = [
 ]
 
 
-def setLocationsTableForeignKey(
-    fk_table: type[Base], nullable: bool = False
-) -> Mapped[uuid.UUID]:
+def setLocationsTableForeignKey(fk_table: type[Base], nullable: bool = False) -> Mapped[uuid.UUID]:
     return mapped_column(ForeignKey(f"{fk_table.__table__}.id"), nullable=nullable)
 
 
-def setUniqueConstraintName(constraint: Constraint, table: Table) -> str:
+def setUniqueConstraintName(constraint: Constraint) -> str:
     if isinstance(constraint, ColumnCollectionConstraint):
         cols = [c.name for c in constraint.columns]
         return cols[0] if len(cols) == 1 else "_".join(cols)
@@ -67,7 +64,7 @@ def setGeometryMappedColumn(
     )
 
 
-NAMING_CONVENTION = {
+NAMING_CONVENTION: dict = {
     "uqConstraint": setUniqueConstraintName,
     "pk": "pk_%(table_name)s",
     # "ix": "ix_%(table_name)s_%(column_0_N_name)s",
@@ -84,7 +81,7 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
     @declared_attr.directive
-    def __table_args__(cls) -> tuple:
+    def __table_args__(self) -> tuple:
         return ()
 
     serial_id: Mapped[int] = mapped_column(
@@ -161,11 +158,9 @@ class SubStateRegionTableBase(LocationsSchema, GeoTypeMixin, HasStateIdFkMixin):
     __abstract__ = True
 
     @declared_attr.directive
-    def __table_args__(cls) -> tuple:
+    def __table_args__(self) -> tuple:
         return (
-            UniqueConstraint(
-                "state_id", "name", name=f"uq_{cls.__tablename__}_state_id_name"
-            ),
+            UniqueConstraint("state_id", "name", name=f"uq_{self.__tablename__}_state_id_name"),
             *LocationsSchema.__table_args__,
         )
 

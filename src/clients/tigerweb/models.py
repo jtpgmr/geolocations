@@ -46,13 +46,14 @@ __all__ = [
 Name = Annotated[str, Field(validation_alias="BASENAME")]
 CentroidLatitude = Annotated[PydanticLatitude, Field(validation_alias="CENTLAT")]
 CentroidLongitude = Annotated[PydanticLongitude, Field(validation_alias="CENTLON")]
-StateTigerWebNumber = Annotated[
-    str, Field(alias="state_number", validation_alias="STATE")
-]
-TigerWebNumber = lambda alias_geotype, validation_alias="GEOID": Field(
-    alias=f"{alias_geotype}_number",
-    validation_alias=validation_alias,
-)
+StateTigerWebNumber = Annotated[str, Field(alias="state_number", validation_alias="STATE")]
+
+
+def TigerWebNumber(alias_geotype: str, validation_alias: str = "GEOID") -> str:
+    return Field(
+        alias=f"{alias_geotype}_number",
+        validation_alias=validation_alias,
+    )
 
 
 class NearbyCitiesSchema(BaseModel):
@@ -87,9 +88,7 @@ class LocationGeometriesModel(BaseModel, ABC):
     @computed_field
     def centroid(self) -> InstanceOf[WKBElement]:
         # x = longitude, y = latitude
-        return from_shape(
-            Point(self.central_longitude, self.central_latitude), srid=EPSG
-        )
+        return from_shape(Point(self.central_longitude, self.central_latitude), srid=EPSG)
 
     @computed_field
     def boundary(
@@ -119,18 +118,14 @@ class LocationGeometriesModel(BaseModel, ABC):
         if not polygons:
             raise ValueError("No usable rings (each needs at least 4 points)")
 
-        shape: Polygon | MultiPolygon = reduce(
-            lambda a, b: a.symmetric_difference(b), polygons
-        )
+        shape: Polygon | MultiPolygon = reduce(lambda a, b: a.symmetric_difference(b), polygons)
 
         if isinstance(shape, Polygon):
             shape = MultiPolygon([shape])
 
         if shape.geom_type == "GeometryCollection":
             polygons = [
-                part
-                for part in get_parts(shape)
-                if isinstance(part, (Polygon, MultiPolygon))
+                part for part in get_parts(shape) if isinstance(part, (Polygon, MultiPolygon))
             ]
 
             if not polygons:

@@ -35,7 +35,7 @@ compare_server_default = True
 MANAGED_SCHEMA_NAMES = list(Schema)
 
 
-def includeName(name: str | None, db_obj_type: str, parent_names: dict) -> bool:
+def includeName(name: str | None, db_obj_type: str) -> bool:
     if db_obj_type == "schema":
         return name in MANAGED_SCHEMA_NAMES
     return True
@@ -100,17 +100,13 @@ async def run_connectable(connectable: AsyncEngine):
 
 
 async def run_async_migrations(database_url: str) -> None:
-    connectable: AsyncEngine = create_async_engine(
-        database_url, poolclass=pool.NullPool
-    )
+    connectable: AsyncEngine = create_async_engine(database_url, poolclass=pool.NullPool)
 
     await run_connectable(connectable)
 
 
 def run_migrations_online(database_url: str) -> None:
-    connectable: AsyncEngine = create_async_engine(
-        database_url, poolclass=pool.NullPool
-    )
+    connectable: AsyncEngine = create_async_engine(database_url, poolclass=pool.NullPool)
 
     asyncio.run(run_connectable(connectable))
 

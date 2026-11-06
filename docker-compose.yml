@@ -7,9 +7,9 @@ services:
     environment:
       DB__DATABASE_NAME: ${DB__DATABASE_NAME:-postgres}
       DB__USER: ${DB__USER:-postgres}
-      DB__PASSWORD: ${DB__PASSWORD:-postgres}
-      DB__PORT: ${DB__PORT:-5432}
-      DB__HOST: ${DB__HOST:-geo-db}
+      DB__PASSWORD: ${DB__PASSWORD}
+      DB__PORT: 5432
+      DB__HOST: geo-db
     # ports:
     #   - "8000:8000"
     volumes:
@@ -27,20 +27,20 @@ services:
     environment:
       POSTGRES_DB: ${DB__DATABASE_NAME:-postgres}
       POSTGRES_USER: ${DB__USER:-postgres}
-      POSTGRES_PASSWORD: ${DB__PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${DB__PASSWORD}
     ports:
-      - ${DB__PORT:-5432}:5432
+      - 127.0.0.1:${DB__PORT:-5432}:5432
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     healthcheck:
       test:
         - CMD-SHELL
-        - pg_isready -h 127.0.0.1 -p ${DB__PORT:-5432} -U ${DB__USER:-postgres} -d ${DB__DATABASE_NAME:-postgres}
+        - pg_isready -h 127.0.0.1 -p 5432 -U ${DB__USER:-postgres} -d ${DB__DATABASE_NAME:-postgres}
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 10s
-    
+
   geo-db-migration-worker:
     build:
       context: .
@@ -49,15 +49,13 @@ services:
     environment:
       DB__DATABASE_NAME: ${DB__DATABASE_NAME:-postgres}
       DB__USER: ${DB__USER:-postgres}
-      DB__PASSWORD: ${DB__PASSWORD:-postgres}
-      DB__PORT: ${DB__PORT:-5432}
-      DB__HOST: ${DB__HOST:-geo-db}
+      DB__PASSWORD: ${DB__PASSWORD}
+      DB__PORT: 5432
+      DB__HOST: geo-db
     depends_on:
       geo-db:
         condition: service_healthy
     command: uv run --no-sync alembic upgrade head
-  
 
 volumes:
   postgres_data:
-

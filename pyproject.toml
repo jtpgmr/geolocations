@@ -6,8 +6,6 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "alembic>=1.20.0",
-    "asyncpg>=0.31.0",
-    "fastapi>=0.141.1",
     "geoalchemy2[shapely]>=0.20.0",
     "geopandas>=1.1.4",
     "httpx2>=2.13.0",
@@ -30,6 +28,17 @@ dev = [
     "ty>=0.0.83",
 ]
 
+agno = [
+   "agno>=3.1.10",
+   "ddgs>=9.16.1",
+   "mcp>=2.3.0",
+   "openai>=3.37.0",
+   "pgvector>=0.5.1",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
 [tool.alembic]
 script_location = "alembic"
 prepend_sys_path = "."
@@ -37,4 +46,32 @@ prepend_sys_path = "."
 [tool.ruff]
 extend-exclude = [
     "alembic/versions/"
+]
+line-length = 100
+
+
+
+
+[tool.ruff.lint]
+select = [
+    "E", "W",    # pycodestyle
+    "F",         # pyflakes
+    "I",         # isort
+    "B",         # bugbear (mutable defaults, useless expressions)
+    "UP",        # pyupgrade (keeps typing syntax modern automatically)
+    "SIM",       # simplify
+    "C4",        # comprehensions
+    "RET",       # return statements
+    "ARG",       # unused arguments
+    "PTH",       # enforce pathlib over os.path
+    "DTZ",       # naive datetime detection
+    "S",         # bandit security checks
+    "N",         # naming (snake_case funcs, PascalCase classes)
+    "RUF",       # ruff-specific
+]
+ignore = [
+    "E501",      # line length — ruff format owns it
+    "S101",      # assert is fine in tests
+    "N802",     # allows uppercasing in function names
+    "ARG001", "ARG002" # allows unused arguments, ideally used for **kwargs
 ]

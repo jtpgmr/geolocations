@@ -46,7 +46,7 @@ class DatabaseSettings(BaseSettings):
     @field_validator("port", mode="before")
     @classmethod
     def setDefaultPort(cls, port: object) -> object:
-        return 5432 if not port else port
+        return port if port else 5432
 
     @computed_field
     @property

@@ -6,8 +6,6 @@ import httpx2
 
 from src.clients.__base__ import AsyncHttpClient
 from src.clients.tigerweb.models import (
-    GeoTypeModel,
-    LocationGeometriesModel,
     LocationModel,
     TigerWebEndpointParams,
 )
@@ -29,6 +27,7 @@ class TigerWebClient:
     async def __aexit__(self, *exc: object) -> None:
         if self._owns_http:
             return await self._http.__aexit__(*exc)
+        return None
 
     def _generateEndpoint(self, service: str, layer: int | str) -> str:
         return f"/{service}/MapServer/{layer}/query"
@@ -78,9 +77,7 @@ class TigerWebClient:
     ) -> list[LocationModel]:
         endpoint = self._generateEndpoint(service, layer)
 
-        if params.return_geometry and (
-            not params.out_sr or not params.max_allowable_offset
-        ):
+        if params.return_geometry and (not params.out_sr or not params.max_allowable_offset):
             params.out_sr = params.out_sr or EPSG
             params.max_allowable_offset = params.max_allowable_offset or 0.001
 
@@ -88,6 +85,4 @@ class TigerWebClient:
 
         response: httpx2.Response = await self.call(endpoint, params=params)
 
-        locations = self.filterAPIQueryMetadata(response, model)
-
-        return locations
+        return self.filterAPIQueryMetadata(response, model)
